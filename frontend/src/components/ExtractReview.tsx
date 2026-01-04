@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
 import type { IdentifiedTransaction } from '../types';
 
 interface ExtractReviewProps {

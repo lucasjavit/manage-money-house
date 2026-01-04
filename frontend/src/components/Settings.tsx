@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { configurationService } from '../services/configurationService';
-import type { Configuration } from '../types';
 
 const Settings = () => {
   const [openAIKey, setOpenAIKey] = useState('');

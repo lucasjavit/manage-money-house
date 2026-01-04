@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { extractService, type ExtractUploadRequest } from '../services/extractService';
-import type { ExtractProcessResponse, IdentifiedTransaction, ExtractTransaction } from '../types';
+import type { IdentifiedTransaction, ExtractTransaction } from '../types';
 
 const ExtractUpload = () => {
   const { user } = useAuth();
@@ -131,8 +131,7 @@ const ExtractUpload = () => {
     try {
       console.log('Carregando transações para o usuário:', user.id, 'Mês:', selectedMonth, 'Ano:', selectedYear);
       
-      // Calcular primeiro e último dia do mês selecionado
-      const startDate = new Date(selectedYear, selectedMonth - 1, 1);
+      // Calcular último dia do mês selecionado
       const endDate = new Date(selectedYear, selectedMonth, 0); // Último dia do mês
       
       const startDateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
@@ -150,6 +149,8 @@ const ExtractUpload = () => {
     }
   };
 
+  // Função para salvar transações (não utilizada atualmente)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleSaveTransactions = async (transactionsToSave: IdentifiedTransaction[]) => {
     if (!user) return;
 

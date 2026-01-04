@@ -7,7 +7,7 @@ interface RecurringExpenseButtonProps {
   onCreate: (expenseTypeId: number, startMonth: number, endMonth: number, monthlyAmount: number, startDate?: string, endDate?: string) => Promise<void>;
 }
 
-const RecurringExpenseButton = ({ expenseTypes, year, onCreate }: RecurringExpenseButtonProps) => {
+const RecurringExpenseButton = ({ expenseTypes, onCreate }: RecurringExpenseButtonProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [expenseTypeId, setExpenseTypeId] = useState<number>(0);
   const [startDate, setStartDate] = useState<string>('');

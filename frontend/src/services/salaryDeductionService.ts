@@ -1,5 +1,6 @@
 import api from './api';
-import type { BoletoProcessResponse, SalaryDeduction, SalaryDeductionRequest, ExtractUploadRequest } from '../types';
+import type { BoletoProcessResponse, SalaryDeduction, SalaryDeductionRequest } from '../types';
+import type { ExtractUploadRequest } from './extractService';
 
 export const salaryDeductionService = {
   async processBoleto(request: ExtractUploadRequest): Promise<BoletoProcessResponse> {

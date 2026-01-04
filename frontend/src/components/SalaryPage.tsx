@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { salaryService } from '../services/salaryService';
 import { salaryDeductionService } from '../services/salaryDeductionService';
-import type { Salary, SalaryRequest, SalaryCalculationResponse, AnnualSalaryCalculationResponse, SalaryDeduction, BoletoProcessResponse, ExtractUploadRequest } from '../types';
+import type { Salary, SalaryRequest, SalaryCalculationResponse, AnnualSalaryCalculationResponse, SalaryDeduction, BoletoProcessResponse } from '../types';
+import type { ExtractUploadRequest } from '../services/extractService';
 
 const SalaryPage = () => {
   const { user } = useAuth();

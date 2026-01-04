@@ -261,6 +261,8 @@ const ExpenseSheet = () => {
     return marianaTotal - lucasTotal;
   };
 
+  // Função para calcular dívida do mês atual (não utilizada atualmente)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const calculateCurrentMonthLucasDebt = (): number => {
     const currentMonth = new Date().getMonth() + 1;
     return calculateLucasDebt(currentMonth);
