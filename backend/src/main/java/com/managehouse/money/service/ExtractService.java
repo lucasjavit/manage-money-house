@@ -1,14 +1,16 @@
 package com.managehouse.money.service;
 
-import com.managehouse.money.dto.ExtractProcessResponse;
-import com.managehouse.money.dto.ExtractUploadRequest;
-import com.managehouse.money.dto.IdentifiedTransaction;
-import com.managehouse.money.dto.OpenAIRequest;
-import com.managehouse.money.dto.OpenAIResponse;
-import com.managehouse.money.entity.ExpenseType;
-import com.managehouse.money.repository.ExpenseTypeRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
@@ -20,12 +22,16 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.time.LocalDate;
-import java.util.*;
-import java.util.Base64;
-import java.util.stream.Collectors;
+import com.managehouse.money.dto.ExtractProcessResponse;
+import com.managehouse.money.dto.ExtractUploadRequest;
+import com.managehouse.money.dto.IdentifiedTransaction;
+import com.managehouse.money.dto.OpenAIRequest;
+import com.managehouse.money.dto.OpenAIResponse;
+import com.managehouse.money.entity.ExpenseType;
+import com.managehouse.money.repository.ExpenseTypeRepository;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor

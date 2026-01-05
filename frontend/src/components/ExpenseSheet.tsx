@@ -285,13 +285,31 @@ const ExpenseSheet = () => {
 
   const calculateLucasDebt = (month: number): number => {
     const monthExpenses = expenses.filter((e) => e.month === month);
-    const marianaTotal = monthExpenses
-      .filter((e) => e.userColor === 'pink')
-      .reduce((sum, e) => sum + e.amount, 0);
-    const lucasTotal = monthExpenses
+    
+    // Total do mês (todas as despesas)
+    const totalMonth = monthExpenses.reduce((sum, e) => sum + e.amount, 0);
+    
+    // Cada um deveria pagar (metade do total) - lógica Splitwise
+    const eachShouldPay = totalMonth / 2;
+    
+    // O que cada um pagou
+    const lucasPaid = monthExpenses
       .filter((e) => e.userColor === 'blue')
       .reduce((sum, e) => sum + e.amount, 0);
-    return marianaTotal - lucasTotal;
+    
+    const marianaPaid = monthExpenses
+      .filter((e) => e.userColor === 'pink')
+      .reduce((sum, e) => sum + e.amount, 0);
+    
+    // Saldo do Lucas: o que ele pagou - o que ele deveria pagar
+    // Se negativo: Lucas deve para Mariana
+    // Se positivo: Mariana deve para Lucas
+    const lucasBalance = lucasPaid - eachShouldPay;
+    
+    // Retornar o valor que Lucas deve (negativo do saldo se ele deve)
+    // Se lucasBalance é negativo, ele deve o valor absoluto
+    // Se lucasBalance é positivo, Mariana deve (retornar negativo para indicar)
+    return -lucasBalance;
   };
 
   // Função para calcular dívida do mês atual (não utilizada atualmente)
@@ -343,10 +361,10 @@ const ExpenseSheet = () => {
                 lucasDebt > 0 ? 'text-blue-700' : lucasDebt < 0 ? 'text-emerald-600' : 'text-slate-600'
               }`}>
                 {lucasDebt > 0 
-                  ? formatCurrency(lucasDebt)
+                  ? formatCurrency(lucasDebt) + ' (Lucas deve)'
                   : lucasDebt < 0
-                  ? `-${formatCurrency(Math.abs(lucasDebt))}`
-                  : formatCurrency(0)
+                  ? formatCurrency(Math.abs(lucasDebt)) + ' (Mariana deve)'
+                  : formatCurrency(0) + ' (Quites)'
                 }
               </p>
               <p className="text-sm font-medium text-blue-700/80 mt-3 mb-1">
