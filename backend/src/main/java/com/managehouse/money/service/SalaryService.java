@@ -192,7 +192,16 @@ public class SalaryService {
             throw new RuntimeException("User does not have hourly rate configured");
         }
 
-        int workingDays = calculateWorkingDays(request.getYear(), request.getMonth());
+        // Calcular dias úteis do mês ANTERIOR (mês trabalhado)
+        // O mês selecionado é o mês de pagamento, mas o trabalho foi feito no mês anterior
+        int workMonth = request.getMonth() - 1;
+        int workYear = request.getYear();
+        if (workMonth < 1) {
+            workMonth = 12;
+            workYear = workYear - 1;
+        }
+        
+        int workingDays = calculateWorkingDays(workYear, workMonth);
         int hoursPerDay = 8; // Assumindo 8 horas por dia
         int totalHours = workingDays * hoursPerDay;
         

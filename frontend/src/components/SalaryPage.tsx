@@ -501,16 +501,29 @@ const SalaryPage = () => {
                       </div>
 
                       {/* Resumo Visual */}
-                      <div className="grid grid-cols-2 gap-3 mb-4">
-                        <div className="bg-white/60 rounded-lg p-3 border border-emerald-200">
-                          <p className="text-xs text-slate-600 mb-1">Dias úteis</p>
-                          <p className="text-lg font-bold text-slate-800">{calculation.workingDays}</p>
-                        </div>
-                        <div className="bg-white/60 rounded-lg p-3 border border-emerald-200">
-                          <p className="text-xs text-slate-600 mb-1">Total de horas</p>
-                          <p className="text-lg font-bold text-slate-800">{calculation.totalHours}h</p>
-                        </div>
-                      </div>
+                      {(() => {
+                        // Calcular mês anterior (mês trabalhado)
+                        let workMonth = calculation.month - 1;
+                        let workYear = calculation.year;
+                        if (workMonth < 1) {
+                          workMonth = 12;
+                          workYear = workYear - 1;
+                        }
+                        return (
+                          <div className="grid grid-cols-2 gap-3 mb-4">
+                            <div className="bg-white/60 rounded-lg p-3 border border-emerald-200">
+                              <p className="text-xs text-slate-600 mb-1">Dias úteis trabalhados</p>
+                              <p className="text-lg font-bold text-slate-800">{calculation.workingDays}</p>
+                              <p className="text-[10px] text-slate-500 mt-0.5">em {getMonthName(workMonth)}/{workYear}</p>
+                            </div>
+                            <div className="bg-white/60 rounded-lg p-3 border border-emerald-200">
+                              <p className="text-xs text-slate-600 mb-1">Total de horas trabalhadas</p>
+                              <p className="text-lg font-bold text-slate-800">{calculation.totalHours}h</p>
+                              <p className="text-[10px] text-slate-500 mt-0.5">em {getMonthName(workMonth)}/{workYear}</p>
+                            </div>
+                          </div>
+                        );
+                      })()}
 
                       {/* Seção 1: Salário Bruto (USD/BRL) - Colapsável */}
                       <div className="mb-3">
