@@ -63,11 +63,6 @@ services:
       args:
         - VITE_API_URL=${VITE_API_URL:-/api}
     container_name: manage-house-money-frontend
-    labels:
-      - "coolify.managed=true"
-      - "coolify.name=frontend"
-      - "coolify.port=80"
-      - "coolify.type=application"
     expose:
       - "80"
     depends_on:
