@@ -20,11 +20,12 @@ public class SpaController {
     /**
      * Serve index.html for all non-API routes for SPA routing
      * This allows React Router to handle client-side routing
+     * Excludes: files with extensions, /api, /actuator
      */
     @GetMapping(value = {
         "/",
-        "/{path:[^\\.]*}",
-        "/{path:^(?!api|actuator).*}/**"
+        "/{path:(?!api|actuator)[^\\.]*}",
+        "/{path:(?!api|actuator)[^\\.]*}/**"
     })
     public void serveIndex(HttpServletResponse response) throws IOException {
         response.setContentType(MediaType.TEXT_HTML_VALUE);
