@@ -26,6 +26,7 @@ services:
     container_name: manage-house-money-backend
     labels:
       - "coolify.managed=true"
+      - "coolify.name=backend"
       - "coolify.port=8080"
     environment:
       - SPRING_PROFILES_ACTIVE=prod
@@ -64,7 +65,9 @@ services:
     container_name: manage-house-money-frontend
     labels:
       - "coolify.managed=true"
+      - "coolify.name=frontend"
       - "coolify.port=80"
+      - "coolify.type=application"
     expose:
       - "80"
     depends_on:
