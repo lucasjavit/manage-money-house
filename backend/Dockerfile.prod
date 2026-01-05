@@ -1,0 +1,55 @@
+# Build do frontend
+FROM node:20-alpine AS frontend-build
+
+WORKDIR /frontend
+
+# Copiar arquivos de dependências do frontend
+COPY frontend/package*.json ./
+RUN npm ci
+
+# Copiar código fonte do frontend e compilar
+COPY frontend .
+ARG VITE_API_URL=/api
+ENV VITE_API_URL=$VITE_API_URL
+RUN npm run build
+
+# Build do backend
+FROM eclipse-temurin:21-jdk-alpine AS backend-build
+
+WORKDIR /app
+
+# Copiar arquivos Maven
+COPY pom.xml .
+COPY mvnw .
+COPY .mvn .mvn
+
+# Baixar dependências
+RUN ./mvnw dependency:go-offline
+
+# Copiar código fonte e compilar
+COPY src ./src
+RUN ./mvnw clean package -DskipTests
+
+# Imagem final
+FROM eclipse-temurin:21-jre-alpine
+
+WORKDIR /app
+
+# Instalar wget para health check
+RUN apk add --no-cache wget
+
+# Copiar JAR do backend
+COPY --from=backend-build /app/target/*.jar app.jar
+
+# Copiar arquivos do frontend buildado
+COPY --from=frontend-build /frontend/dist /app/static
+
+# Configurar Spring para servir arquivos estáticos do frontend
+ENV SPRING_WEB_RESOURCES_STATIC_LOCATIONS=classpath:/META-INF/resources/,classpath:/resources/,classpath:/static/,classpath:/public/,file:/app/static/
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1
+
+ENTRYPOINT ["java", "-jar", "app.jar"]
