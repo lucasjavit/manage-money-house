@@ -82,16 +82,17 @@ const ExpenseSheet = () => {
   };
 
   const handleDeleteExpenseType = async (id: number, name: string) => {
-    if (!confirm(`Tem certeza que deseja excluir o tipo "${name}"?\n\nIsso também excluirá todas as despesas relacionadas a este tipo.`)) {
+    if (!confirm(`Tem certeza que deseja excluir o tipo "${name}"?`)) {
       return;
     }
 
     try {
       await expenseService.deleteExpenseType(id);
       await loadData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting expense type:', error);
-      alert('Erro ao excluir tipo de despesa');
+      const errorMessage = error.response?.data?.error || error.message || 'Erro ao excluir tipo de despesa';
+      alert(errorMessage);
     }
   };
 

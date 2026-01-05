@@ -23,6 +23,10 @@ const SalaryPage = () => {
   const [processingBoleto, setProcessingBoleto] = useState(false);
   const [boletoData, setBoletoData] = useState<BoletoProcessResponse | null>(null);
   const [editingBoleto, setEditingBoleto] = useState<{ description: string; amount: string; dueDate: string }>({ description: '', amount: '', dueDate: '' });
+  const [showDeductions, setShowDeductions] = useState<boolean>(false);
+  const [showSalaryDetails, setShowSalaryDetails] = useState<boolean>(false);
+  const [showSalaryGross, setShowSalaryGross] = useState<boolean>(false);
+  const [showDeductionsDetails, setShowDeductionsDetails] = useState<boolean>(false);
 
   const isLucas = user?.email === 'vyeiralucas@gmail.com';
   const isMariana = user?.email === 'marii_borges@hotmail.com';
@@ -295,11 +299,14 @@ const SalaryPage = () => {
   const years = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 2 + i);
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
+    <div className="max-w-6xl mx-auto p-6 space-y-6">
       <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border-2 border-slate-200/60 p-6">
-        <h2 className="text-2xl font-bold text-slate-800 mb-6">
-          {isMariana ? 'Salário Fixo' : isLucas ? 'Salário Variável (por hora)' : 'Salário'}
+        <h2 className="text-3xl font-bold text-slate-800 mb-2">
+          {isMariana ? 'Salário Fixo' : isLucas ? 'Salário Variável' : 'Salário'}
         </h2>
+        <p className="text-sm text-slate-600 mb-6">
+          {isMariana ? 'Gerencie seu salário fixo mensal' : isLucas ? 'Configure seu valor por hora e acompanhe seus cálculos' : 'Gerencie seu salário'}
+        </p>
 
         {error && (
           <div className="bg-red-50 border-2 border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
@@ -354,21 +361,25 @@ const SalaryPage = () => {
 
             {/* Exibição do Salário Fixo */}
             {salary?.fixedAmount && (
-              <div className="bg-gradient-to-r from-emerald-50 to-emerald-100 border-2 border-emerald-200 rounded-xl p-6">
-                <div className="flex items-center justify-between">
+              <div className="bg-gradient-to-br from-pink-50 via-pink-50 to-pink-100 border-2 border-pink-200 rounded-xl p-8 shadow-lg">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-4">
                   <div>
-                    <h3 className="text-lg font-bold text-slate-800 mb-1">
-                      Salário Fixo Registrado
+                    <h3 className="text-xl font-bold text-slate-800 mb-2">
+                      Salário Fixo Mensal
                     </h3>
                     <p className="text-sm text-slate-600">
-                      Última atualização: {new Date(salary.updatedAt).toLocaleDateString('pt-BR')}
+                      Última atualização: {new Date(salary.updatedAt).toLocaleDateString('pt-BR', { 
+                        day: '2-digit', 
+                        month: 'long', 
+                        year: 'numeric' 
+                      })}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-3xl font-bold text-emerald-700">
+                  <div className="text-center md:text-right">
+                    <p className="text-4xl font-bold text-pink-700 mb-1">
                       {formatCurrency(salary.fixedAmount, 'BRL')}
                     </p>
-                    <p className="text-sm text-slate-600 mt-1">por mês</p>
+                    <p className="text-sm text-slate-600">por mês</p>
                   </div>
                 </div>
               </div>
@@ -379,6 +390,7 @@ const SalaryPage = () => {
         {/* Formulário para Lucas (Variável) */}
         {isLucas && (
           <>
+            {/* Configuração do Valor por Hora */}
             <div className="bg-slate-50 border-2 border-slate-200 rounded-xl p-6 mb-6">
               <h3 className="text-lg font-semibold text-slate-800 mb-4">
                 {salary?.hourlyRate ? 'Atualizar Valor por Hora' : 'Registrar Valor por Hora'}
@@ -467,215 +479,342 @@ const SalaryPage = () => {
               )}
             </div>
 
-            {/* Exibição do Valor por Hora Registrado */}
+            {/* Layout em Grid para Lucas */}
             {salary?.hourlyRate && (
-              <div className="bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-200 rounded-xl p-6 mb-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-800 mb-1">
-                      Valor por Hora Registrado
-                    </h3>
-                    <p className="text-sm text-slate-600">
-                      Última atualização: {new Date(salary.updatedAt).toLocaleDateString('pt-BR')}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-3xl font-bold text-blue-700">
-                      {formatCurrency(salary.hourlyRate, 'USD')}
-                    </p>
-                    <p className="text-sm text-slate-600 mt-1">por hora</p>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                {/* Coluna 1: Cálculo do Mês (Destaque) */}
+                <div className="lg:col-span-2">
+                  {calculation && (
+                    <div className="bg-white border-2 border-slate-200 rounded-xl p-6 shadow-lg">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-xl font-bold text-slate-800">
+                          {getMonthName(calculation.month)} de {calculation.year}
+                        </h3>
+                        {salary?.hourlyRate && (
+                          <div className="text-right">
+                            <p className="text-xs text-slate-600">Valor por hora</p>
+                            <p className="text-sm font-bold text-blue-700">
+                              {formatCurrency(salary.hourlyRate, 'USD')}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Resumo Visual */}
+                      <div className="grid grid-cols-2 gap-3 mb-4">
+                        <div className="bg-white/60 rounded-lg p-3 border border-emerald-200">
+                          <p className="text-xs text-slate-600 mb-1">Dias úteis</p>
+                          <p className="text-lg font-bold text-slate-800">{calculation.workingDays}</p>
+                        </div>
+                        <div className="bg-white/60 rounded-lg p-3 border border-emerald-200">
+                          <p className="text-xs text-slate-600 mb-1">Total de horas</p>
+                          <p className="text-lg font-bold text-slate-800">{calculation.totalHours}h</p>
+                        </div>
+                      </div>
+
+                      {/* Seção 1: Salário Bruto (USD/BRL) - Colapsável */}
+                      <div className="mb-3">
+                        <button
+                          onClick={() => setShowSalaryGross(!showSalaryGross)}
+                          className="w-full flex items-center justify-between mb-2 p-2 bg-white/60 rounded-lg border border-emerald-200 hover:bg-white/80 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <svg 
+                              xmlns="http://www.w3.org/2000/svg" 
+                              className={`h-4 w-4 transition-transform ${showSalaryGross ? 'rotate-90' : ''}`} 
+                              fill="none" 
+                              viewBox="0 0 24 24" 
+                              stroke="currentColor"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                            <span className="text-sm font-semibold text-slate-700">Salário bruto (BRL)</span>
+                          </div>
+                          <p className="text-base font-bold text-emerald-700">
+                            {formatCurrency(
+                              calculation.totalAmountBRL || (calculation.totalAmount * (calculation.exchangeRate || 5.42)), 
+                              'BRL'
+                            )}
+                          </p>
+                        </button>
+
+                        {/* Detalhes do Salário Bruto expandidos */}
+                        {showSalaryGross && (
+                          <div className="space-y-2 pl-6">
+                            <div className="flex items-center justify-between bg-white/60 rounded-lg p-2.5 border border-emerald-200">
+                              <p className="text-xs font-semibold text-slate-700">Salário bruto (USD)</p>
+                              <p className="text-sm font-bold text-blue-700">
+                                {formatCurrency(calculation.totalAmount, 'USD')}
+                              </p>
+                            </div>
+                            <div className="flex items-center justify-between bg-white/60 rounded-lg p-2.5 border border-emerald-200">
+                              <div>
+                                <p className="text-xs text-slate-500">Taxa: {(calculation.exchangeRate || 5.42).toFixed(2)}</p>
+                                <p className="text-xs font-semibold text-slate-700">Salário bruto (BRL)</p>
+                              </div>
+                              <p className="text-sm font-bold text-emerald-700">
+                                {formatCurrency(
+                                  calculation.totalAmountBRL || (calculation.totalAmount * (calculation.exchangeRate || 5.42)), 
+                                  'BRL'
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Seção 2: Descontos (Boletos e Dívida) - Colapsável */}
+                      {(calculation.totalDeductions !== undefined && calculation.totalDeductions > 0) || 
+                       (calculation.lucasDebt !== undefined && calculation.lucasDebt !== 0) ? (
+                        <div className="mb-4">
+                          {(() => {
+                            const totalDeductions = (calculation.totalDeductions || 0) + (calculation.lucasDebt && calculation.lucasDebt > 0 ? calculation.lucasDebt : 0);
+                            return (
+                              <button
+                                onClick={() => setShowDeductionsDetails(!showDeductionsDetails)}
+                                className="w-full flex items-center justify-between mb-2 p-2 bg-white/60 rounded-lg border border-red-200 hover:bg-white/80 transition-colors"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <svg 
+                                    xmlns="http://www.w3.org/2000/svg" 
+                                    className={`h-4 w-4 transition-transform ${showDeductionsDetails ? 'rotate-90' : ''}`} 
+                                    fill="none" 
+                                    viewBox="0 0 24 24" 
+                                    stroke="currentColor"
+                                  >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                  </svg>
+                                  <span className="text-sm font-semibold text-slate-700">Descontos</span>
+                                </div>
+                                <p className="text-base font-bold text-red-700">
+                                  - {formatCurrency(totalDeductions, 'BRL')}
+                                </p>
+                              </button>
+                            );
+                          })()}
+
+                          {/* Detalhes dos Descontos expandidos */}
+                          {showDeductionsDetails && (
+                            <div className="space-y-2 pl-6">
+                              {calculation.totalDeductions !== undefined && calculation.totalDeductions > 0 && (
+                                <div className="flex items-center justify-between bg-red-50 rounded-lg p-2.5 border-2 border-red-200">
+                                  <p className="text-xs font-semibold text-slate-800">Descontos (boletos)</p>
+                                  <p className="text-sm font-bold text-red-700">
+                                    - {formatCurrency(calculation.totalDeductions, 'BRL')}
+                                  </p>
+                                </div>
+                              )}
+                              {calculation.lucasDebt !== undefined && calculation.lucasDebt !== 0 && (
+                                <div className={`flex items-center justify-between rounded-lg p-2.5 border-2 ${
+                                  calculation.lucasDebt > 0 
+                                    ? 'bg-blue-50 border-blue-200' 
+                                    : 'bg-pink-50 border-pink-200'
+                                }`}>
+                                  <p className="text-xs font-semibold text-slate-800">
+                                    {calculation.lucasDebt > 0 
+                                      ? 'Dívida para Mariana' 
+                                      : 'Mariana deve'}
+                                  </p>
+                                  <p className={`text-sm font-bold ${
+                                    calculation.lucasDebt > 0 ? 'text-blue-700' : 'text-pink-700'
+                                  }`}>
+                                    {calculation.lucasDebt > 0 ? '-' : '+'} {formatCurrency(Math.abs(calculation.lucasDebt), 'BRL')}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
+
+                      {/* Salário Líquido em Destaque */}
+                      <div className="bg-gradient-to-r from-emerald-100 to-emerald-200 rounded-lg p-4 border-2 border-emerald-300 shadow-md">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold text-slate-700">Salário líquido</span>
+                          <span className="text-xl font-bold text-emerald-800">
+                            {formatCurrency(
+                              calculation.netSalaryBRL || (calculation.totalAmountBRL || (calculation.totalAmount * (calculation.exchangeRate || 5.42))) - (calculation.totalDeductions || 0) - (calculation.lucasDebt && calculation.lucasDebt > 0 ? calculation.lucasDebt : 0),
+                              'BRL'
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Coluna 2: Boletos do Mês */}
+                <div className="lg:col-span-1">
+                  <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border-2 border-slate-200/60 p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <button
+                        onClick={() => setShowDeductions(!showDeductions)}
+                        className="flex items-center gap-2 text-sm font-bold text-slate-800 hover:text-blue-600 transition-colors"
+                      >
+                        <svg 
+                          xmlns="http://www.w3.org/2000/svg" 
+                          className={`h-4 w-4 transition-transform ${showDeductions ? 'rotate-90' : ''}`} 
+                          fill="none" 
+                          viewBox="0 0 24 24" 
+                          stroke="currentColor"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                        <span>Descontos</span>
+                        {deductions.length > 0 && (
+                          <span className="text-xs font-normal text-slate-500">
+                            ({deductions.length})
+                          </span>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => setShowBoletoModal(true)}
+                        className="px-2.5 py-1 text-xs font-semibold text-white bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-md flex items-center gap-1"
+                        title="Adicionar boleto"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Adicionar
+                      </button>
+                    </div>
+
+                    {/* Total sempre visível */}
+                    {deductions.length > 0 && (
+                      <div className="mb-2 pb-2 border-b border-slate-200">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-semibold text-slate-600">Total:</p>
+                          <p className="text-base font-bold text-red-700">
+                            {formatCurrency(
+                              deductions.reduce((sum, d) => sum + d.amount, 0),
+                              'BRL'
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Lista de boletos (colapsável) */}
+                    {showDeductions && (
+                      <div className="mt-2">
+                        {loadingDeductions ? (
+                          <div className="flex justify-center py-4">
+                            <svg className="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                          </div>
+                        ) : deductions.length > 0 ? (
+                          <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
+                            {deductions.map((deduction) => (
+                              <div key={deduction.id} className="flex items-start justify-between p-2 bg-slate-50 rounded-lg border border-slate-200">
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold text-slate-800 text-xs truncate">{deduction.description}</p>
+                                  <p className="text-xs text-slate-500">
+                                    {new Date(deduction.dueDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-1.5 ml-2">
+                                  <p className="text-xs font-bold text-red-700">
+                                    {formatCurrency(deduction.amount, 'BRL')}
+                                  </p>
+                                  <button
+                                    onClick={() => handleDeleteDeduction(deduction.id)}
+                                    className="text-red-600 hover:text-red-800 text-xs px-1 py-0.5 hover:bg-red-50 rounded transition-colors"
+                                    title="Excluir"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-4 text-slate-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mx-auto mb-1 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <p className="text-xs">Nenhum boleto</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Cálculo Anual */}
+            {/* Projeção Anual (Seção Separada) */}
             {annualCalculation && (
-              <div className="bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-200 rounded-xl p-6 mb-6">
-                <h3 className="text-lg font-bold text-slate-800 mb-4">
+              <div className="bg-gradient-to-br from-blue-50 via-blue-50 to-blue-100 border-2 border-blue-200 rounded-xl p-6 shadow-lg">
+                <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
                   Projeção Anual {annualCalculation.year}
                 </h3>
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <p className="text-sm text-slate-600">Total de dias úteis</p>
-                    <p className="text-xl font-bold text-slate-800">{annualCalculation.totalWorkingDays} dias</p>
+                
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  <div className="bg-white/60 rounded-lg p-3 border border-blue-200">
+                    <p className="text-xs text-slate-600 mb-1">Dias úteis</p>
+                    <p className="text-lg font-bold text-slate-800">{annualCalculation.totalWorkingDays}</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-slate-600">Total de horas</p>
-                    <p className="text-xl font-bold text-slate-800">{annualCalculation.totalHours} horas</p>
+                  <div className="bg-white/60 rounded-lg p-3 border border-blue-200">
+                    <p className="text-xs text-slate-600 mb-1">Total de horas</p>
+                    <p className="text-lg font-bold text-slate-800">{annualCalculation.totalHours}h</p>
                   </div>
-                </div>
-                <div className="border-t-2 border-blue-300 pt-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-lg font-semibold text-slate-800">Total anual (USD)</p>
-                    <p className="text-2xl font-bold text-blue-700">
+                  <div className="bg-white/60 rounded-lg p-3 border border-blue-200">
+                    <p className="text-xs text-slate-600 mb-1">Total (USD)</p>
+                    <p className="text-lg font-bold text-blue-700">
                       {formatCurrency(annualCalculation.totalAmountUSD, 'USD')}
                     </p>
                   </div>
-                  <div className="flex items-center justify-between bg-white/60 rounded-lg p-3">
-                    <div>
-                      <p className="text-sm text-slate-600">Taxa de câmbio</p>
-                      <p className="text-xs text-slate-500">
-                        USD → BRL: {(annualCalculation.exchangeRate || 5.42).toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lg font-semibold text-slate-800">Salário bruto anual (BRL)</p>
-                      <p className="text-2xl font-bold text-emerald-700">
-                        {formatCurrency(annualCalculation.totalAmountBRL || (annualCalculation.totalAmountUSD * (annualCalculation.exchangeRate || 5.42)), 'BRL')}
-                      </p>
-                    </div>
+                  <div className="bg-white/60 rounded-lg p-3 border border-blue-200">
+                    <p className="text-xs text-slate-600 mb-1">Taxa de câmbio</p>
+                    <p className="text-lg font-bold text-slate-800">
+                      {(annualCalculation.exchangeRate || 5.42).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="border-t-2 border-blue-300 pt-4 space-y-2">
+                  <div className="flex items-center justify-between bg-white/60 rounded-lg p-3 border border-blue-200">
+                    <p className="text-sm font-semibold text-slate-800">Salário bruto anual (BRL)</p>
+                    <p className="text-base font-bold text-emerald-700">
+                      {formatCurrency(annualCalculation.totalAmountBRL || (annualCalculation.totalAmountUSD * (annualCalculation.exchangeRate || 5.42)), 'BRL')}
+                    </p>
                   </div>
                   {annualCalculation.totalDeductions !== undefined && annualCalculation.totalDeductions > 0 && (
                     <div className="flex items-center justify-between bg-red-50 rounded-lg p-3 border-2 border-red-200">
-                      <p className="text-lg font-semibold text-slate-800">Total de descontos no ano</p>
-                      <p className="text-2xl font-bold text-red-700">
+                      <p className="text-sm font-semibold text-slate-800">Descontos no ano (boletos)</p>
+                      <p className="text-base font-bold text-red-700">
                         - {formatCurrency(annualCalculation.totalDeductions, 'BRL')}
                       </p>
                     </div>
                   )}
-                  <div className="flex items-center justify-between bg-gradient-to-r from-emerald-100 to-emerald-200 rounded-lg p-4 border-2 border-emerald-300">
-                    <p className="text-xl font-bold text-slate-800">Salário líquido anual</p>
-                    <p className="text-3xl font-bold text-emerald-800">
-                      {formatCurrency(
-                        annualCalculation.netSalaryBRL || (annualCalculation.totalAmountBRL || (annualCalculation.totalAmountUSD * (annualCalculation.exchangeRate || 5.42))) - (annualCalculation.totalDeductions || 0),
-                        'BRL'
-                      )}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Seção de Boletos (apenas para Lucas) */}
-            {isLucas && (
-              <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border-2 border-slate-200/60 p-6 mb-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-bold text-slate-800">
-                    Boletos - {getMonthName(selectedMonth)} de {selectedYear}
-                  </h3>
-                  <button
-                    onClick={() => setShowBoletoModal(true)}
-                    className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-md flex items-center gap-2"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    Adicionar Boleto
-                  </button>
-                </div>
-
-                {loadingDeductions ? (
-                  <div className="flex justify-center py-4">
-                    <svg className="animate-spin h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                  </div>
-                ) : deductions.length > 0 ? (
-                  <div className="space-y-2">
-                    {deductions.map((deduction) => (
-                      <div key={deduction.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
-                        <div className="flex-1">
-                          <p className="font-semibold text-slate-800">{deduction.description}</p>
-                          <p className="text-sm text-slate-600">
-                            Vencimento: {new Date(deduction.dueDate).toLocaleDateString('pt-BR')}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <p className="text-lg font-bold text-red-700">
-                            {formatCurrency(deduction.amount, 'BRL')}
-                          </p>
-                          <button
-                            onClick={() => handleDeleteDeduction(deduction.id)}
-                            className="text-red-600 hover:text-red-800 font-semibold px-2 py-1 hover:bg-red-50 rounded transition-colors"
-                          >
-                            Excluir
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    <div className="mt-4 pt-4 border-t-2 border-slate-300 flex items-center justify-between">
-                      <p className="text-lg font-bold text-slate-800">Total de descontos:</p>
-                      <p className="text-2xl font-bold text-red-700">
-                        {formatCurrency(
-                          deductions.reduce((sum, d) => sum + d.amount, 0),
-                          'BRL'
-                        )}
+                  {annualCalculation.totalLucasDebt !== undefined && annualCalculation.totalLucasDebt !== 0 && (
+                    <div className={`flex items-center justify-between rounded-lg p-3 border-2 ${
+                      annualCalculation.totalLucasDebt > 0 
+                        ? 'bg-blue-50 border-blue-200' 
+                        : 'bg-pink-50 border-pink-200'
+                    }`}>
+                      <p className="text-sm font-semibold text-slate-800">
+                        {annualCalculation.totalLucasDebt > 0 
+                          ? 'Dívida total para Mariana' 
+                          : 'Mariana deve no ano'}
                       </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-6 text-slate-500">
-                    <p>Nenhum boleto adicionado para este mês.</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Cálculo do Salário do Mês */}
-            {calculation && (
-              <div className="bg-gradient-to-r from-emerald-50 to-emerald-100 border-2 border-emerald-200 rounded-xl p-6">
-                <h3 className="text-lg font-bold text-slate-800 mb-4">
-                  Cálculo para {getMonthName(calculation.month)} de {calculation.year}
-                </h3>
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <p className="text-sm text-slate-600">Dias úteis</p>
-                    <p className="text-xl font-bold text-slate-800">{calculation.workingDays} dias</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-600">Horas por dia</p>
-                    <p className="text-xl font-bold text-slate-800">{calculation.hoursPerDay} horas</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-600">Total de horas</p>
-                    <p className="text-xl font-bold text-slate-800">{calculation.totalHours} horas</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-600">Valor por hora</p>
-                    <p className="text-xl font-bold text-slate-800">
-                      {formatCurrency(calculation.hourlyRate, 'USD')}
-                    </p>
-                  </div>
-                </div>
-                <div className="border-t-2 border-emerald-300 pt-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-lg font-semibold text-slate-800">Salário bruto (USD)</p>
-                    <p className="text-2xl font-bold text-blue-700">
-                      {formatCurrency(calculation.totalAmount, 'USD')}
-                    </p>
-                  </div>
-                  <div className="flex items-center justify-between bg-white/60 rounded-lg p-3">
-                    <div>
-                      <p className="text-sm text-slate-600">Taxa de câmbio</p>
-                      <p className="text-xs text-slate-500">
-                        USD → BRL: {(calculation.exchangeRate || 5.42).toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lg font-semibold text-slate-800">Salário bruto (BRL)</p>
-                      <p className="text-2xl font-bold text-emerald-700">
-                        {formatCurrency(
-                          calculation.totalAmountBRL || (calculation.totalAmount * (calculation.exchangeRate || 5.42)), 
-                          'BRL'
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                  {calculation.totalDeductions !== undefined && calculation.totalDeductions > 0 && (
-                    <div className="flex items-center justify-between bg-red-50 rounded-lg p-3 border-2 border-red-200">
-                      <p className="text-lg font-semibold text-slate-800">Total de descontos</p>
-                      <p className="text-2xl font-bold text-red-700">
-                        - {formatCurrency(calculation.totalDeductions, 'BRL')}
+                      <p className={`text-base font-bold ${
+                        annualCalculation.totalLucasDebt > 0 ? 'text-blue-700' : 'text-pink-700'
+                      }`}>
+                        {annualCalculation.totalLucasDebt > 0 ? '-' : '+'} {formatCurrency(Math.abs(annualCalculation.totalLucasDebt), 'BRL')}
                       </p>
                     </div>
                   )}
-                  <div className="flex items-center justify-between bg-gradient-to-r from-emerald-100 to-emerald-200 rounded-lg p-4 border-2 border-emerald-300">
-                    <p className="text-xl font-bold text-slate-800">Salário líquido</p>
-                    <p className="text-4xl font-bold text-emerald-800">
+                  <div className="flex items-center justify-between bg-gradient-to-r from-emerald-100 to-emerald-200 rounded-lg p-4 border-2 border-emerald-300 shadow-md">
+                    <p className="text-sm font-semibold text-slate-800">Salário líquido anual</p>
+                    <p className="text-xl font-bold text-emerald-800">
                       {formatCurrency(
-                        calculation.netSalaryBRL || (calculation.totalAmountBRL || (calculation.totalAmount * (calculation.exchangeRate || 5.42))) - (calculation.totalDeductions || 0),
+                        annualCalculation.netSalaryBRL || (annualCalculation.totalAmountBRL || (annualCalculation.totalAmountUSD * (annualCalculation.exchangeRate || 5.42))) - (annualCalculation.totalDeductions || 0) - (annualCalculation.totalLucasDebt && annualCalculation.totalLucasDebt > 0 ? annualCalculation.totalLucasDebt : 0),
                         'BRL'
                       )}
                     </p>

@@ -17,7 +17,8 @@ public class SalaryCalculationResponse {
     private BigDecimal totalAmount; // Total em USD (bruto)
     private BigDecimal totalAmountBRL; // Total convertido para BRL (bruto)
     private BigDecimal totalDeductions; // Total de descontos (boletos) em BRL
-    private BigDecimal netSalaryBRL; // Salário líquido (bruto - descontos) em BRL
+    private BigDecimal lucasDebt; // Dívida do Lucas para Mariana (se positivo, Lucas deve; se negativo, Mariana deve; se zero, quites)
+    private BigDecimal netSalaryBRL; // Salário líquido (bruto - descontos - dívida) em BRL
     private BigDecimal exchangeRate; // Taxa de câmbio USD para BRL
     private String currency; // "USD"
     private Integer month;

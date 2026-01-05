@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -58,6 +59,43 @@ public class ExpenseService {
     @Transactional
     public void deleteExpense(Long id) {
         expenseRepository.deleteById(id);
+    }
+
+    /**
+     * Calcula a dívida do Lucas para um mês/ano específico usando a lógica Splitwise.
+     * Retorna um valor positivo se Lucas deve para Mariana, negativo se Mariana deve para Lucas, ou zero se estão quites.
+     */
+    public BigDecimal calculateLucasDebt(Integer year, Integer month) {
+        // Buscar todas as despesas do mês
+        List<Expense> monthExpenses = expenseRepository.findByYearAndMonth(year, month);
+        
+        if (monthExpenses.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        
+        // Calcular total do mês
+        BigDecimal totalMonth = monthExpenses.stream()
+                .map(Expense::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        // Cada um deveria pagar (metade do total) - lógica Splitwise
+        BigDecimal eachShouldPay = totalMonth.divide(new BigDecimal("2"), 2, java.math.RoundingMode.HALF_UP);
+        
+        // O que cada um pagou
+        BigDecimal lucasPaid = monthExpenses.stream()
+                .filter(e -> "blue".equals(e.getUser().getColor()))
+                .map(Expense::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        // Saldo do Lucas: o que ele pagou - o que ele deveria pagar
+        // Se negativo: Lucas deve para Mariana
+        // Se positivo: Mariana deve para Lucas
+        BigDecimal lucasBalance = lucasPaid.subtract(eachShouldPay);
+        
+        // Retornar o valor que Lucas deve (negativo do saldo)
+        // Se lucasBalance é negativo, ele deve o valor absoluto
+        // Se lucasBalance é positivo, Mariana deve (retornar negativo para indicar)
+        return lucasBalance.negate();
     }
 
     private ExpenseResponse toResponse(Expense expense) {

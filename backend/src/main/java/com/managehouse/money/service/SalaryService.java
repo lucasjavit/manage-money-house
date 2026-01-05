@@ -38,6 +38,7 @@ public class SalaryService {
     private final UserService userService;
     private final ConfigurationService configurationService;
     private final SalaryDeductionService salaryDeductionService;
+    private final ExpenseService expenseService;
 
     @Value("${openai.api.url:https://api.openai.com/v1/chat/completions}")
     private String apiUrl;
@@ -212,8 +213,23 @@ public class SalaryService {
                 request.getYear()
         );
 
-        // Calcular salário líquido
+        // Calcular dívida do Lucas (se for o Lucas)
+        BigDecimal lucasDebt = BigDecimal.ZERO;
+        User user = userService.findById(request.getUserId()).orElse(null);
+        if (user != null && "vyeiralucas@gmail.com".equals(user.getEmail())) {
+            // Calcular dívida do Lucas para o mês/ano
+            lucasDebt = expenseService.calculateLucasDebt(request.getYear(), request.getMonth());
+            // Se lucasDebt > 0, Lucas deve para Mariana (descontar)
+            // Se lucasDebt < 0, Mariana deve para Lucas (não descontar, mas pode mostrar)
+            // Se lucasDebt = 0, estão quites
+        }
+
+        // Calcular salário líquido (descontar boletos e dívida se Lucas deve)
         BigDecimal netSalaryBRL = totalAmountBRL.subtract(totalDeductions);
+        if (lucasDebt.compareTo(BigDecimal.ZERO) > 0) {
+            // Lucas deve para Mariana, descontar do salário
+            netSalaryBRL = netSalaryBRL.subtract(lucasDebt);
+        }
         if (netSalaryBRL.compareTo(BigDecimal.ZERO) < 0) {
             netSalaryBRL = BigDecimal.ZERO;
         }
@@ -222,6 +238,7 @@ public class SalaryService {
         log.info("SalaryService.calculateVariableSalary - Total USD: {}", totalAmount);
         log.info("SalaryService.calculateVariableSalary - Total BRL: {}", totalAmountBRL);
         log.info("SalaryService.calculateVariableSalary - Total Deductions: {}", totalDeductions);
+        log.info("SalaryService.calculateVariableSalary - Lucas Debt: {}", lucasDebt);
         log.info("SalaryService.calculateVariableSalary - Net Salary BRL: {}", netSalaryBRL);
 
         return new SalaryCalculationResponse(
@@ -232,6 +249,7 @@ public class SalaryService {
                 totalAmount,
                 totalAmountBRL,
                 totalDeductions,
+                lucasDebt,
                 netSalaryBRL,
                 exchangeRate,
                 salary.getCurrency() != null ? salary.getCurrency() : "USD",
@@ -278,8 +296,26 @@ public class SalaryService {
             totalDeductions = totalDeductions.add(monthDeductions);
         }
 
-        // Calcular salário líquido anual
+        // Calcular dívida total do Lucas (se for o Lucas)
+        BigDecimal totalLucasDebt = BigDecimal.ZERO;
+        User user = userService.findById(userId).orElse(null);
+        if (user != null && "vyeiralucas@gmail.com".equals(user.getEmail())) {
+            // Calcular dívida do Lucas para cada mês do ano
+            for (int month = 1; month <= 12; month++) {
+                BigDecimal monthDebt = expenseService.calculateLucasDebt(year, month);
+                if (monthDebt.compareTo(BigDecimal.ZERO) > 0) {
+                    // Lucas deve para Mariana, somar ao total
+                    totalLucasDebt = totalLucasDebt.add(monthDebt);
+                }
+            }
+        }
+
+        // Calcular salário líquido anual (descontar boletos e dívida se Lucas deve)
         BigDecimal netSalaryBRL = totalAmountBRL.subtract(totalDeductions);
+        if (totalLucasDebt.compareTo(BigDecimal.ZERO) > 0) {
+            // Lucas deve para Mariana, descontar do salário
+            netSalaryBRL = netSalaryBRL.subtract(totalLucasDebt);
+        }
         if (netSalaryBRL.compareTo(BigDecimal.ZERO) < 0) {
             netSalaryBRL = BigDecimal.ZERO;
         }
@@ -290,6 +326,7 @@ public class SalaryService {
         log.info("SalaryService.calculateAnnualSalary - Total USD: {}", totalAmountUSD);
         log.info("SalaryService.calculateAnnualSalary - Total BRL: {}", totalAmountBRL);
         log.info("SalaryService.calculateAnnualSalary - Total Deductions: {}", totalDeductions);
+        log.info("SalaryService.calculateAnnualSalary - Total Lucas Debt: {}", totalLucasDebt);
         log.info("SalaryService.calculateAnnualSalary - Net Salary BRL: {}", netSalaryBRL);
 
         return new AnnualSalaryCalculationResponse(
@@ -301,6 +338,7 @@ public class SalaryService {
                 totalAmountUSD,
                 totalAmountBRL,
                 totalDeductions,
+                totalLucasDebt,
                 netSalaryBRL,
                 exchangeRate,
                 salary.getCurrency() != null ? salary.getCurrency() : "USD"

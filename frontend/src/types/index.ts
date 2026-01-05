@@ -129,6 +129,7 @@ export interface SalaryCalculationResponse {
   totalAmount: number;
   totalAmountBRL?: number;
   totalDeductions?: number;
+  lucasDebt?: number; // Dívida do Lucas para Mariana (se positivo, Lucas deve; se negativo, Mariana deve; se zero, quites)
   netSalaryBRL?: number;
   exchangeRate?: number;
   currency: string;
@@ -145,6 +146,7 @@ export interface AnnualSalaryCalculationResponse {
   totalAmountUSD: number;
   totalAmountBRL: number;
   totalDeductions?: number;
+  totalLucasDebt?: number; // Dívida total do Lucas para Mariana no ano (se positivo, Lucas deve; se negativo, Mariana deve; se zero, quites)
   netSalaryBRL?: number;
   exchangeRate: number;
   currency: string;
