@@ -18,6 +18,13 @@ public class SpaErrorController implements ErrorController {
     @RequestMapping("/error")
     public void handleError(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Object status = request.getAttribute(RequestDispatcher.ERROR_STATUS_CODE);
+        String requestUri = (String) request.getAttribute(RequestDispatcher.ERROR_REQUEST_URI);
+
+        // Não processar requisições de API
+        if (requestUri != null && (requestUri.startsWith("/api") || requestUri.startsWith("/actuator"))) {
+            response.sendError(HttpServletResponse.SC_NOT_FOUND, "Not found");
+            return;
+        }
 
         if (status != null) {
             int statusCode = Integer.parseInt(status.toString());
