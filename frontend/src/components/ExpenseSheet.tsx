@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import type { Expense, ExpenseType, ExpenseRequest } from '../types';
 import { expenseService } from '../services/expenseService';
 import { recurringExpenseService } from '../services/recurringExpenseService';
+import type { Expense, ExpenseRequest, ExpenseType } from '../types';
 import RecurringExpenseButton from './RecurringExpenseButton';
 
 const ExpenseSheet = () => {
@@ -20,6 +20,8 @@ const ExpenseSheet = () => {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [paidMonths, setPaidMonths] = useState<Set<string>>(new Set());
+  const [showAddTypeModal, setShowAddTypeModal] = useState(false);
+  const [newTypeName, setNewTypeName] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
   const monthNames = [
@@ -59,6 +61,37 @@ const ExpenseSheet = () => {
       console.error('Error loading data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAddExpenseType = async () => {
+    if (!newTypeName.trim()) {
+      alert('Por favor, informe um nome para o tipo de despesa');
+      return;
+    }
+
+    try {
+      await expenseService.createExpenseType(newTypeName.trim());
+      setNewTypeName('');
+      setShowAddTypeModal(false);
+      await loadData();
+    } catch (error) {
+      console.error('Error creating expense type:', error);
+      alert('Erro ao criar tipo de despesa. Verifique se o nome já existe.');
+    }
+  };
+
+  const handleDeleteExpenseType = async (id: number, name: string) => {
+    if (!confirm(`Tem certeza que deseja excluir o tipo "${name}"?\n\nIsso também excluirá todas as despesas relacionadas a este tipo.`)) {
+      return;
+    }
+
+    try {
+      await expenseService.deleteExpenseType(id);
+      await loadData();
+    } catch (error) {
+      console.error('Error deleting expense type:', error);
+      alert('Erro ao excluir tipo de despesa');
     }
   };
 
@@ -417,7 +450,21 @@ const ExpenseSheet = () => {
             <thead className="bg-gradient-to-r from-slate-50 via-slate-50 to-slate-100/80">
               <tr>
                 <th className="px-1 py-2 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider sticky left-0 bg-gradient-to-r from-slate-50 via-slate-50 to-slate-100/80 z-10 border-r-2 border-slate-200/60 w-[80px] shadow-sm">
-                  Tipo
+                  <div className="flex items-center justify-between gap-1">
+                    <span>Tipo</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowAddTypeModal(true);
+                      }}
+                      className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100 rounded p-0.5 transition-colors"
+                      title="Adicionar tipo"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                    </button>
+                  </div>
                 </th>
                 {monthNames.map((month, index) => {
                   const monthNumber = index + 1;
@@ -456,8 +503,22 @@ const ExpenseSheet = () => {
             <tbody className="bg-white divide-y divide-slate-100/60">
               {expenseTypes.map((type) => (
                 <tr key={type.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-1 py-1.5 text-[10px] font-semibold text-slate-800 sticky left-0 bg-white z-10 border-r-2 border-slate-200/60 shadow-sm w-[80px]">
-                    {type.name}
+                  <td className="px-1 py-1.5 text-[10px] font-semibold text-slate-800 sticky left-0 bg-white z-10 border-r-2 border-slate-200/60 shadow-sm w-[80px] group/type">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="flex-1 truncate">{type.name}</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteExpenseType(type.id, type.name);
+                        }}
+                        className="opacity-0 group-hover/type:opacity-100 text-red-600 hover:text-red-700 hover:bg-red-50 rounded p-0.5 transition-all"
+                        title="Excluir tipo"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
                   </td>
                   {monthNames.map((_, monthIndex) => {
                     const month = monthIndex + 1;
@@ -564,6 +625,70 @@ const ExpenseSheet = () => {
           </table>
         </div>
       </div>
+
+      {/* Modal para adicionar tipo */}
+      {showAddTypeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4 border-2 border-slate-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-bold text-slate-800">Adicionar Tipo de Despesa</h3>
+              <button
+                onClick={() => {
+                  setShowAddTypeModal(false);
+                  setNewTypeName('');
+                }}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div>
+              <label htmlFor="type-name" className="block text-sm font-semibold text-slate-700 mb-2">
+                Nome do Tipo
+              </label>
+              <input
+                id="type-name"
+                type="text"
+                value={newTypeName}
+                onChange={(e) => setNewTypeName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddExpenseType();
+                  } else if (e.key === 'Escape') {
+                    setShowAddTypeModal(false);
+                    setNewTypeName('');
+                  }
+                }}
+                placeholder="Ex: Aluguel, Viagem, Dívida Carro..."
+                className="w-full px-4 py-2 border-2 border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all bg-white text-slate-800"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setShowAddTypeModal(false);
+                  setNewTypeName('');
+                }}
+                className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 border-2 border-slate-300 rounded-lg hover:bg-slate-200 transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleAddExpenseType}
+                className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-md"
+              >
+                Adicionar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
