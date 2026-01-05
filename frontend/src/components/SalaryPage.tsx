@@ -516,13 +516,13 @@ const SalaryPage = () => {
                     <div>
                       <p className="text-sm text-slate-600">Taxa de câmbio</p>
                       <p className="text-xs text-slate-500">
-                        USD → BRL: {(annualCalculation.exchangeRate || 5).toFixed(2)}
+                        USD → BRL: {(annualCalculation.exchangeRate || 5.42).toFixed(2)}
                       </p>
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-semibold text-slate-800">Salário bruto anual (BRL)</p>
                       <p className="text-2xl font-bold text-emerald-700">
-                        {formatCurrency(annualCalculation.totalAmountBRL || (annualCalculation.totalAmountUSD * (annualCalculation.exchangeRate || 5)), 'BRL')}
+                        {formatCurrency(annualCalculation.totalAmountBRL || (annualCalculation.totalAmountUSD * (annualCalculation.exchangeRate || 5.42)), 'BRL')}
                       </p>
                     </div>
                   </div>
@@ -538,7 +538,7 @@ const SalaryPage = () => {
                     <p className="text-xl font-bold text-slate-800">Salário líquido anual</p>
                     <p className="text-3xl font-bold text-emerald-800">
                       {formatCurrency(
-                        annualCalculation.netSalaryBRL || (annualCalculation.totalAmountBRL || (annualCalculation.totalAmountUSD * (annualCalculation.exchangeRate || 5))) - (annualCalculation.totalDeductions || 0),
+                        annualCalculation.netSalaryBRL || (annualCalculation.totalAmountBRL || (annualCalculation.totalAmountUSD * (annualCalculation.exchangeRate || 5.42))) - (annualCalculation.totalDeductions || 0),
                         'BRL'
                       )}
                     </p>
@@ -650,14 +650,14 @@ const SalaryPage = () => {
                     <div>
                       <p className="text-sm text-slate-600">Taxa de câmbio</p>
                       <p className="text-xs text-slate-500">
-                        USD → BRL: {(calculation.exchangeRate || 5).toFixed(2)}
+                        USD → BRL: {(calculation.exchangeRate || 5.42).toFixed(2)}
                       </p>
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-semibold text-slate-800">Salário bruto (BRL)</p>
                       <p className="text-2xl font-bold text-emerald-700">
                         {formatCurrency(
-                          calculation.totalAmountBRL || (calculation.totalAmount * (calculation.exchangeRate || 5)), 
+                          calculation.totalAmountBRL || (calculation.totalAmount * (calculation.exchangeRate || 5.42)), 
                           'BRL'
                         )}
                       </p>
@@ -675,7 +675,7 @@ const SalaryPage = () => {
                     <p className="text-xl font-bold text-slate-800">Salário líquido</p>
                     <p className="text-4xl font-bold text-emerald-800">
                       {formatCurrency(
-                        calculation.netSalaryBRL || (calculation.totalAmountBRL || (calculation.totalAmount * (calculation.exchangeRate || 5))) - (calculation.totalDeductions || 0),
+                        calculation.netSalaryBRL || (calculation.totalAmountBRL || (calculation.totalAmount * (calculation.exchangeRate || 5.42))) - (calculation.totalDeductions || 0),
                         'BRL'
                       )}
                     </p>

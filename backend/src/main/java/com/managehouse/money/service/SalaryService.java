@@ -78,11 +78,12 @@ public class SalaryService {
             log.warn("Erro ao buscar taxa de câmbio da IA, retornando zero: " + e.getMessage());
         }
         
-        // Se a IA falhar, retornar zero
-        log.warn("Taxa de câmbio não disponível (IA falhou), retornando zero");
-        // Limpar cache se estiver com valor zero
-        cachedExchangeRate = null;
-        return BigDecimal.ZERO;
+        // Se a IA falhar, usar o valor de fallback configurado
+        BigDecimal fallbackRate = new BigDecimal(usdToBrlRateStr);
+        log.warn("Taxa de câmbio não disponível (IA falhou), usando fallback: " + fallbackRate);
+        cachedExchangeRate = fallbackRate;
+        cacheTimestamp = currentTime;
+        return fallbackRate;
     }
     
     private BigDecimal fetchExchangeRateFromAI() {
