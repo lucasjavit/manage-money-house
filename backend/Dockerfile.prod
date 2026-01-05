@@ -19,15 +19,15 @@ FROM eclipse-temurin:21-jdk-alpine AS backend-build
 WORKDIR /app
 
 # Copiar arquivos Maven
-COPY pom.xml .
-COPY mvnw .
-COPY .mvn .mvn
+COPY backend/pom.xml .
+COPY backend/mvnw .
+COPY backend/.mvn .mvn
 
 # Baixar dependências
 RUN ./mvnw dependency:go-offline
 
 # Copiar código fonte e compilar
-COPY src ./src
+COPY backend/src ./src
 RUN ./mvnw clean package -DskipTests
 
 # Imagem final
