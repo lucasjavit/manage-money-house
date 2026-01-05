@@ -14,21 +14,19 @@ ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
 # Build do backend
-FROM eclipse-temurin:21-jdk-alpine AS backend-build
+FROM maven:3.9-eclipse-temurin-21-alpine AS backend-build
 
 WORKDIR /app
 
-# Copiar arquivos Maven
+# Copiar arquivo pom.xml
 COPY backend/pom.xml .
-COPY backend/mvnw .
-COPY backend/.mvn .mvn
 
 # Baixar dependências
-RUN ./mvnw dependency:go-offline
+RUN mvn dependency:go-offline -B
 
 # Copiar código fonte e compilar
 COPY backend/src ./src
-RUN ./mvnw clean package -DskipTests
+RUN mvn clean package -DskipTests -B
 
 # Imagem final
 FROM eclipse-temurin:21-jre-alpine
