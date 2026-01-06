@@ -129,15 +129,26 @@ const ExtractUpload = () => {
     if (!user) return;
     setLoadingTransactions(true);
     try {
-      console.log('Carregando transações para o usuário:', user.id, 'Mês:', selectedMonth, 'Ano:', selectedYear);
+      // Para cartão de crédito: transações do mês anterior serão pagas no mês selecionado
+      // Exemplo: se selecionou Janeiro, buscar transações de Dezembro
+      let transactionMonth = selectedMonth - 1;
+      let transactionYear = selectedYear;
       
-      // Calcular último dia do mês selecionado
-      const endDate = new Date(selectedYear, selectedMonth, 0); // Último dia do mês
+      if (transactionMonth < 1) {
+        transactionMonth = 12;
+        transactionYear = transactionYear - 1;
+      }
       
-      const startDateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
-      const endDateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
+      console.log('Carregando transações para o usuário:', user.id, 'Mês de pagamento:', selectedMonth, 'Ano:', selectedYear);
+      console.log('Buscando transações do mês anterior:', transactionMonth, 'Ano:', transactionYear);
       
-      console.log('Filtrando por:', { startDateStr, endDateStr, selectedMonth, selectedYear });
+      // Calcular último dia do mês anterior (mês da transação)
+      const endDate = new Date(transactionYear, transactionMonth, 0); // Último dia do mês
+      
+      const startDateStr = `${transactionYear}-${String(transactionMonth).padStart(2, '0')}-01`;
+      const endDateStr = `${transactionYear}-${String(transactionMonth).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
+      
+      console.log('Filtrando por:', { startDateStr, endDateStr, transactionMonth, transactionYear });
       
       const transactions = await extractService.getTransactionsByDateRange(user.id, startDateStr, endDateStr);
       console.log('Transações carregadas (filtradas):', transactions.length, transactions);
@@ -205,35 +216,40 @@ const ExtractUpload = () => {
     }
   };
 
-  // Agrupar transações por mês/ano (apenas do mês selecionado)
+  // Agrupar transações por mês/ano de pagamento (mês seguinte à transação)
   const groupTransactionsByMonth = (transactions: ExtractTransaction[]) => {
     const grouped: { [key: string]: ExtractTransaction[] } = {};
     
-    // Filtrar apenas transações do mês/ano selecionado
-    const filteredTransactions = transactions.filter((transaction) => {
+    // Para cartão de crédito: transações são agrupadas pelo mês de pagamento (mês seguinte)
+    // Exemplo: transação de 11/12/2025 será agrupada em Janeiro (mês de pagamento)
+    transactions.forEach((transaction) => {
+      // Parsear a data da transação
       const dateParts = transaction.transactionDate.split('-');
-      const year = parseInt(dateParts[0], 10);
-      const month = parseInt(dateParts[1], 10);
-      return year === selectedYear && month === selectedMonth;
-    });
-    
-    console.log('Transações filtradas para o mês selecionado:', filteredTransactions.length, 'de', transactions.length, 'total');
-    
-    filteredTransactions.forEach((transaction) => {
-      // Parsear a data manualmente para evitar problemas de timezone
-      // transactionDate vem no formato "YYYY-MM-DD"
-      const dateParts = transaction.transactionDate.split('-');
-      const year = parseInt(dateParts[0], 10);
-      const month = parseInt(dateParts[1], 10);
+      const transactionYear = parseInt(dateParts[0], 10);
+      const transactionMonth = parseInt(dateParts[1], 10);
       
-      // Criar chave no formato YYYY-MM
-      const monthYear = `${year}-${String(month).padStart(2, '0')}`;
+      // Calcular mês de pagamento (mês seguinte)
+      let paymentMonth = transactionMonth + 1;
+      let paymentYear = transactionYear;
       
-      if (!grouped[monthYear]) {
-        grouped[monthYear] = [];
+      if (paymentMonth > 12) {
+        paymentMonth = 1;
+        paymentYear = paymentYear + 1;
       }
-      grouped[monthYear].push(transaction);
+      
+      // Filtrar apenas transações que serão pagas no mês/ano selecionado
+      if (paymentYear === selectedYear && paymentMonth === selectedMonth) {
+        // Criar chave no formato YYYY-MM (mês de pagamento)
+        const monthYear = `${paymentYear}-${String(paymentMonth).padStart(2, '0')}`;
+        
+        if (!grouped[monthYear]) {
+          grouped[monthYear] = [];
+        }
+        grouped[monthYear].push(transaction);
+      }
     });
+    
+    console.log('Transações agrupadas por mês de pagamento:', Object.keys(grouped).length, 'grupos');
 
     // Nomes dos meses em português
     const monthNames = [
@@ -429,7 +445,12 @@ const ExtractUpload = () => {
       {/* Seção de Transações Salvas */}
       <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border-2 border-slate-200/60 p-6">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-slate-800">Transações do Cartão de Crédito</h2>
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800">Transações do Cartão de Crédito</h2>
+            <p className="text-sm text-slate-600 mt-1">
+              Selecione o mês de <strong>pagamento</strong> da fatura. As transações exibidas são do mês anterior.
+            </p>
+          </div>
           <div className="flex items-center gap-3">
             {/* Seletor de Mês */}
             <select
@@ -510,14 +531,14 @@ const ExtractUpload = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="text-lg font-bold text-slate-800 capitalize">
-                        {group.monthYearLabel}
+                        {group.monthYearLabel} (Mês de Pagamento)
                       </h3>
                       <p className="text-sm text-slate-600 mt-1">
-                        {group.transactions.length} {group.transactions.length === 1 ? 'transação' : 'transações'}
+                        {group.transactions.length} {group.transactions.length === 1 ? 'transação' : 'transações'} do mês anterior
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-slate-600">Total do mês</p>
+                      <p className="text-sm text-slate-600">Total da fatura</p>
                       <p className="text-xl font-bold text-blue-700">
                         {new Intl.NumberFormat('pt-BR', {
                           style: 'currency',
