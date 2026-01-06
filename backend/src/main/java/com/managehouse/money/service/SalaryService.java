@@ -39,6 +39,7 @@ public class SalaryService {
     private final ConfigurationService configurationService;
     private final SalaryDeductionService salaryDeductionService;
     private final ExpenseService expenseService;
+    private final SalaryConversionService salaryConversionService;
 
     @Value("${openai.api.url:https://api.openai.com/v1/chat/completions}")
     private String apiUrl;
@@ -188,32 +189,94 @@ public class SalaryService {
         Salary salary = salaryRepository.findByUserId(request.getUserId())
                 .orElseThrow(() -> new RuntimeException("Salary not found for user"));
 
-        if (salary.getHourlyRate() == null) {
-            throw new RuntimeException("User does not have hourly rate configured");
-        }
-
-        // Calcular dias úteis do mês ANTERIOR (mês trabalhado)
-        // O mês selecionado é o mês de pagamento, mas o trabalho foi feito no mês anterior
-        int workMonth = request.getMonth() - 1;
-        int workYear = request.getYear();
-        if (workMonth < 1) {
-            workMonth = 12;
-            workYear = workYear - 1;
-        }
+        // Verificar se existe conversão salva para o mês de pagamento
+        com.managehouse.money.dto.SalaryConversionResponse savedConversion = 
+            salaryConversionService.getConversionByMonthAndYear(request.getUserId(), request.getMonth(), request.getYear());
         
-        int workingDays = calculateWorkingDays(workYear, workMonth);
-        int hoursPerDay = 8; // Assumindo 8 horas por dia
-        int totalHours = workingDays * hoursPerDay;
+        BigDecimal exchangeRate;
+        BigDecimal totalAmount;
+        BigDecimal totalAmountBRL;
+        int workingDays;
+        int hoursPerDay = 8;
+        int totalHours;
+        BigDecimal hourlyRate = salary.getHourlyRate() != null ? salary.getHourlyRate() : BigDecimal.ZERO;
         
-        BigDecimal totalAmount = salary.getHourlyRate()
-                .multiply(new BigDecimal(totalHours))
-                .setScale(2, RoundingMode.HALF_UP);
-
-        // Converter para BRL
-        BigDecimal exchangeRate = getUsdToBrlRate();
-        BigDecimal totalAmountBRL = totalAmount
-                .multiply(exchangeRate)
-                .setScale(2, RoundingMode.HALF_UP);
+        // Se existe conversão salva com finalAmountBRL, usar esse valor diretamente como salário recebido
+        if (savedConversion != null && savedConversion.getFinalAmountBRL() != null) {
+            // Usar o valor convertido final da conversão como o salário recebido
+            totalAmountBRL = savedConversion.getFinalAmountBRL();
+            exchangeRate = savedConversion.getVet() != null ? savedConversion.getVet() : 
+                          (savedConversion.getExchangeRate() != null ? savedConversion.getExchangeRate() : getUsdToBrlRate());
+            
+            // Calcular dias úteis do mês ANTERIOR (mês trabalhado) para exibição
+            int workMonth = request.getMonth() - 1;
+            int workYear = request.getYear();
+            if (workMonth < 1) {
+                workMonth = 12;
+                workYear = workYear - 1;
+            }
+            workingDays = calculateWorkingDays(workYear, workMonth);
+            totalHours = workingDays * hoursPerDay;
+            
+            // Calcular o valor em USD baseado no valor final em BRL e a taxa de câmbio
+            if (exchangeRate != null && exchangeRate.compareTo(BigDecimal.ZERO) > 0) {
+                totalAmount = totalAmountBRL
+                        .divide(exchangeRate, 2, RoundingMode.HALF_UP);
+            } else {
+                // Fallback: usar hourlyRate * horas se disponível, senão usar amountUSD da conversão
+                if (hourlyRate.compareTo(BigDecimal.ZERO) > 0) {
+                    totalAmount = hourlyRate
+                            .multiply(new BigDecimal(totalHours))
+                            .setScale(2, RoundingMode.HALF_UP);
+                } else if (savedConversion.getAmountUSD() != null) {
+                    totalAmount = savedConversion.getAmountUSD();
+                } else {
+                    totalAmount = BigDecimal.ZERO;
+                }
+                exchangeRate = getUsdToBrlRate(); // Garantir que exchangeRate não seja null
+            }
+            
+            log.info("SalaryService.calculateVariableSalary - Usando conversão salva: finalAmountBRL={}, VET={}, Valor USD calculado={}", 
+                    totalAmountBRL, exchangeRate, totalAmount);
+        } else {
+            // Calcular dias úteis do mês ANTERIOR (mês trabalhado)
+            // O mês selecionado é o mês de pagamento, mas o trabalho foi feito no mês anterior
+            int workMonth = request.getMonth() - 1;
+            int workYear = request.getYear();
+            if (workMonth < 1) {
+                workMonth = 12;
+                workYear = workYear - 1;
+            }
+            
+            workingDays = calculateWorkingDays(workYear, workMonth);
+            totalHours = workingDays * hoursPerDay;
+            
+            // Se não tem hourlyRate, usar zero ou tentar calcular baseado na conversão se disponível
+            if (hourlyRate.compareTo(BigDecimal.ZERO) > 0) {
+                totalAmount = hourlyRate
+                        .multiply(new BigDecimal(totalHours))
+                        .setScale(2, RoundingMode.HALF_UP);
+            } else {
+                totalAmount = BigDecimal.ZERO;
+            }
+            
+            // Converter para BRL - usar VET da conversão se disponível, senão usar IA
+            if (savedConversion != null && savedConversion.getVet() != null) {
+                // Usar VET da conversão salva
+                exchangeRate = savedConversion.getVet();
+                totalAmountBRL = totalAmount
+                        .multiply(exchangeRate)
+                        .setScale(2, RoundingMode.HALF_UP);
+                log.info("SalaryService.calculateVariableSalary - Usando VET da conversão salva: VET={}, Valor final={}", exchangeRate, totalAmountBRL);
+            } else {
+                // Fallback: usar IA para buscar taxa de câmbio
+                exchangeRate = getUsdToBrlRate();
+                totalAmountBRL = totalAmount
+                        .multiply(exchangeRate)
+                        .setScale(2, RoundingMode.HALF_UP);
+                log.info("SalaryService.calculateVariableSalary - Usando taxa de câmbio da IA: {}", exchangeRate);
+            }
+        }
 
         // Calcular descontos (boletos) do mês
         BigDecimal totalDeductions = salaryDeductionService.getTotalDeductionsByMonthAndYear(
@@ -251,7 +314,7 @@ public class SalaryService {
         log.info("SalaryService.calculateVariableSalary - Net Salary BRL: {}", netSalaryBRL);
 
         return new SalaryCalculationResponse(
-                salary.getHourlyRate(),
+                hourlyRate,
                 workingDays,
                 hoursPerDay,
                 new BigDecimal(totalHours),
@@ -289,10 +352,13 @@ public class SalaryService {
                 .multiply(new BigDecimal(totalHours))
                 .setScale(2, RoundingMode.HALF_UP);
 
-        BigDecimal exchangeRate = getUsdToBrlRate();
+        // Para cálculo anual, usar média das conversões salvas ou fallback para IA
+        BigDecimal exchangeRate = getUsdToBrlRate(); // Fallback padrão
         BigDecimal totalAmountBRL = totalAmountUSD
                 .multiply(exchangeRate)
                 .setScale(2, RoundingMode.HALF_UP);
+        
+        // TODO: Implementar lógica para usar conversões salvas no cálculo anual se necessário
 
         // Calcular descontos (boletos) do ano inteiro
         BigDecimal totalDeductions = BigDecimal.ZERO;

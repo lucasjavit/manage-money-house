@@ -179,3 +179,41 @@ export interface SalaryDeductionRequest {
   month: number;
   year: number;
 }
+
+export interface SalaryConversionProcessRequest {
+  text: string;
+  month: number;
+  year: number;
+}
+
+export interface SalaryConversionProcessResponse {
+  conversionDate: string; // YYYY-MM-DD
+  exchangeRate: number;
+  amountUSD: number;
+  vet: number;
+  finalAmountBRL: number;
+  error?: string;
+}
+
+export interface SalaryConversionRequest {
+  userId: number;
+  month: number;
+  year: number;
+  conversionDate: string; // YYYY-MM-DD
+  exchangeRate: number;
+  amountUSD: number;
+  vet: number;
+  finalAmountBRL: number;
+}
+
+export interface SalaryConversionResponse {
+  id: number;
+  userId: number;
+  month: number;
+  year: number;
+  conversionDate: string; // YYYY-MM-DD
+  exchangeRate: number;
+  amountUSD: number;
+  vet: number;
+  finalAmountBRL: number;
+}

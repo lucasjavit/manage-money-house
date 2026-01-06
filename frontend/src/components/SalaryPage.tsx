@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { salaryService } from '../services/salaryService';
 import { salaryDeductionService } from '../services/salaryDeductionService';
-import type { Salary, SalaryRequest, SalaryCalculationResponse, AnnualSalaryCalculationResponse, SalaryDeduction, BoletoProcessResponse } from '../types';
+import { salaryConversionService } from '../services/salaryConversionService';
+import type { Salary, SalaryRequest, SalaryCalculationResponse, AnnualSalaryCalculationResponse, SalaryDeduction, BoletoProcessResponse, SalaryConversionProcessResponse } from '../types';
 import type { ExtractUploadRequest } from '../services/extractService';
 
 const SalaryPage = () => {
@@ -27,6 +28,9 @@ const SalaryPage = () => {
   const [showSalaryDetails, setShowSalaryDetails] = useState<boolean>(false);
   const [showSalaryGross, setShowSalaryGross] = useState<boolean>(false);
   const [showDeductionsDetails, setShowDeductionsDetails] = useState<boolean>(false);
+  const [conversionText, setConversionText] = useState<string>('');
+  const [processingConversion, setProcessingConversion] = useState<boolean>(false);
+  const [conversionData, setConversionData] = useState<SalaryConversionProcessResponse | null>(null);
 
   const isLucas = user?.email === 'vyeiralucas@gmail.com';
   const isMariana = user?.email === 'marii_borges@hotmail.com';
@@ -38,12 +42,12 @@ const SalaryPage = () => {
   }, [user]);
 
   useEffect(() => {
-    if (isLucas && salary?.hourlyRate && selectedMonth && selectedYear) {
+    if (isLucas && selectedMonth && selectedYear) {
       calculateSalary();
       calculateAnnualSalary();
       loadDeductions();
     }
-  }, [isLucas, salary?.hourlyRate, selectedMonth, selectedYear]);
+  }, [isLucas, selectedMonth, selectedYear]);
 
   useEffect(() => {
     if (isLucas && user && selectedMonth && selectedYear) {
@@ -77,7 +81,7 @@ const SalaryPage = () => {
   };
 
   const calculateSalary = async () => {
-    if (!user || !salary?.hourlyRate) return;
+    if (!user) return;
     try {
       const result = await salaryService.calculateVariableSalary({
         userId: user.id,
@@ -88,6 +92,8 @@ const SalaryPage = () => {
       setCalculation(result);
     } catch (err) {
       console.error('Erro ao calcular salário:', err);
+      // Se não houver conversão salva, não mostrar erro
+      setCalculation(null);
     }
   };
 
@@ -215,6 +221,57 @@ const SalaryPage = () => {
     } catch (err) {
       console.error('Erro ao excluir boleto:', err);
       setError('Erro ao excluir boleto.');
+    }
+  };
+
+  const handleProcessConversion = async () => {
+    if (!user || !conversionText.trim()) return;
+    
+    setProcessingConversion(true);
+    setError(null);
+    
+    try {
+      const response = await salaryConversionService.processConversionText({
+        text: conversionText,
+        month: selectedMonth,
+        year: selectedYear,
+      });
+      setConversionData(response);
+      if (response.error) {
+        setError(response.error);
+      }
+    } catch (err: any) {
+      console.error('Erro ao processar conversão:', err);
+      setError(err.response?.data?.error || 'Erro ao processar conversão. Verifique se a API key do OpenAI está configurada.');
+      setConversionData({ conversionDate: '', exchangeRate: 0, amountUSD: 0, vet: 0, finalAmountBRL: 0, error: 'Erro ao processar conversão' });
+    } finally {
+      setProcessingConversion(false);
+    }
+  };
+
+  const handleSaveConversion = async () => {
+    if (!user || !conversionData || conversionData.error) return;
+    
+    try {
+      await salaryConversionService.createOrUpdateConversion({
+        userId: user.id,
+        month: selectedMonth,
+        year: selectedYear,
+        conversionDate: conversionData.conversionDate,
+        exchangeRate: conversionData.exchangeRate,
+        amountUSD: conversionData.amountUSD,
+        vet: conversionData.vet,
+        finalAmountBRL: conversionData.finalAmountBRL,
+      });
+      
+      setConversionText('');
+      setConversionData(null);
+      setError(null);
+      await calculateSalary();
+      await calculateAnnualSalary();
+    } catch (err: any) {
+      console.error('Erro ao salvar conversão:', err);
+      setError('Erro ao salvar conversão.');
     }
   };
 
@@ -390,98 +447,108 @@ const SalaryPage = () => {
         {/* Formulário para Lucas (Variável) */}
         {isLucas && (
           <>
-            {/* Configuração do Valor por Hora */}
+            {/* Seção de Extrair Salário */}
             <div className="bg-slate-50 border-2 border-slate-200 rounded-xl p-6 mb-6">
               <h3 className="text-lg font-semibold text-slate-800 mb-4">
-                {salary?.hourlyRate ? 'Atualizar Valor por Hora' : 'Registrar Valor por Hora'}
+                Extrair Salário
               </h3>
-              
-              <div className="flex items-end gap-4 mb-4">
-                <div className="flex-1">
+
+              {/* Seletores de Mês/Ano */}
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    Valor por Hora (USD)
+                    Mês
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={hourlyRate}
-                    onChange={(e) => setHourlyRate(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full px-4 py-3 border-2 border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all bg-white text-slate-800 text-lg"
-                  />
+                  <select
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(parseInt(e.target.value, 10))}
+                    className="w-full px-4 py-2 border-2 border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-slate-800"
+                  >
+                    <option value={1}>Janeiro</option>
+                    <option value={2}>Fevereiro</option>
+                    <option value={3}>Março</option>
+                    <option value={4}>Abril</option>
+                    <option value={5}>Maio</option>
+                    <option value={6}>Junho</option>
+                    <option value={7}>Julho</option>
+                    <option value={8}>Agosto</option>
+                    <option value={9}>Setembro</option>
+                    <option value={10}>Outubro</option>
+                    <option value={11}>Novembro</option>
+                    <option value={12}>Dezembro</option>
+                  </select>
                 </div>
 
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleSave}
-                    disabled={loading || !hourlyRate}
-                    className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-lg hover:from-emerald-700 hover:to-emerald-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-md hover:shadow-lg"
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    Ano
+                  </label>
+                  <select
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(parseInt(e.target.value, 10))}
+                    className="w-full px-4 py-2 border-2 border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-slate-800"
                   >
-                    {loading ? 'Salvando...' : salary?.hourlyRate ? 'Atualizar' : 'Salvar'}
-                  </button>
-                  {salary?.hourlyRate && (
-                    <button
-                      onClick={handleDelete}
-                      disabled={loading}
-                      className="px-4 py-3 border-2 border-red-300 text-red-700 rounded-lg hover:bg-red-50 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Excluir
-                    </button>
-                  )}
+                    {years.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
-              {/* Seletores de Mês/Ano para Cálculo */}
-              {salary?.hourlyRate && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">
-                      Mês
-                    </label>
-                    <select
-                      value={selectedMonth}
-                      onChange={(e) => setSelectedMonth(parseInt(e.target.value, 10))}
-                      className="w-full px-4 py-2 border-2 border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-slate-800"
-                    >
-                      <option value={1}>Janeiro</option>
-                      <option value={2}>Fevereiro</option>
-                      <option value={3}>Março</option>
-                      <option value={4}>Abril</option>
-                      <option value={5}>Maio</option>
-                      <option value={6}>Junho</option>
-                      <option value={7}>Julho</option>
-                      <option value={8}>Agosto</option>
-                      <option value={9}>Setembro</option>
-                      <option value={10}>Outubro</option>
-                      <option value={11}>Novembro</option>
-                      <option value={12}>Dezembro</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">
-                      Ano
-                    </label>
-                    <select
-                      value={selectedYear}
-                      onChange={(e) => setSelectedYear(parseInt(e.target.value, 10))}
-                      className="w-full px-4 py-2 border-2 border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-slate-800"
-                    >
-                      {years.map((year) => (
-                        <option key={year} value={year}>
-                          {year}
-                        </option>
-                      ))}
-                    </select>
+              {/* Campo para colar texto de conversão */}
+              <div className="mt-4 pt-4 border-t-2 border-slate-300">
+                <h4 className="text-sm font-semibold text-slate-700 mb-2">Extrair salário</h4>
+                  <div className="space-y-3">
+                    <textarea
+                      value={conversionText}
+                      onChange={(e) => setConversionText(e.target.value)}
+                      placeholder="Cole aqui o texto completo da conversão de moeda (Token de cotação, Saque, etc.)..."
+                      className="w-full px-4 py-3 border-2 border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-slate-800 text-sm min-h-[120px]"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleProcessConversion}
+                        disabled={processingConversion || !conversionText.trim()}
+                        className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                      >
+                        {processingConversion ? 'Processando...' : 'Extrair Salário'}
+                      </button>
+                      {conversionData && !conversionData.error && (
+                        <button
+                          onClick={handleSaveConversion}
+                          className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-md"
+                        >
+                          Salvar Salário
+                        </button>
+                      )}
+                    </div>
+                    {conversionData && (
+                      <div className={`p-3 rounded-lg border-2 ${
+                        conversionData.error 
+                          ? 'bg-red-50 border-red-200' 
+                          : 'bg-emerald-50 border-emerald-200'
+                      }`}>
+                        {conversionData.error ? (
+                          <p className="text-sm text-red-700">{conversionData.error}</p>
+                        ) : (
+                          <div className="space-y-1 text-sm">
+                            <p><span className="font-semibold">Data:</span> {new Date(conversionData.conversionDate).toLocaleDateString('pt-BR')}</p>
+                            <p><span className="font-semibold">Cotação:</span> {conversionData.exchangeRate.toFixed(6)}</p>
+                            <p><span className="font-semibold">Valor USD:</span> {formatCurrency(conversionData.amountUSD, 'USD')}</p>
+                            <p><span className="font-semibold">VET:</span> {conversionData.vet.toFixed(6)}</p>
+                            <p><span className="font-semibold">Valor Final BRL:</span> {formatCurrency(conversionData.finalAmountBRL, 'BRL')}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
-              )}
             </div>
 
             {/* Layout em Grid para Lucas */}
-            {salary?.hourlyRate && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
                 {/* Coluna 1: Cálculo do Mês (Destaque) */}
                 <div className="lg:col-span-2">
                   {calculation && (
@@ -490,14 +557,6 @@ const SalaryPage = () => {
                         <h3 className="text-xl font-bold text-slate-800">
                           {getMonthName(calculation.month)} de {calculation.year}
                         </h3>
-                        {salary?.hourlyRate && (
-                          <div className="text-right">
-                            <p className="text-xs text-slate-600">Valor por hora</p>
-                            <p className="text-sm font-bold text-blue-700">
-                              {formatCurrency(salary.hourlyRate, 'USD')}
-                            </p>
-                          </div>
-                        )}
                       </div>
 
                       {/* Resumo Visual */}
@@ -754,8 +813,7 @@ const SalaryPage = () => {
                     )}
                   </div>
                 </div>
-              </div>
-            )}
+            </div>
 
             {/* Projeção Anual (Seção Separada) */}
             {annualCalculation && (
