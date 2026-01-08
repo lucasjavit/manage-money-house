@@ -13,16 +13,40 @@ RUN npm ci
 
 # Copiar código fonte e compilar
 COPY . .
-RUN npm run build
+RUN npm run build && \
+    echo "=== Verificando build ===" && \
+    ls -la dist/ && \
+    test -f dist/index.html && echo "✓ index.html gerado" || (echo "✗ ERRO: index.html não foi gerado!" && exit 1) && \
+    echo "✓ Build concluído com sucesso"
 
 # Imagem final com Nginx
 FROM nginx:alpine
 
-# Copiar arquivos compilados
+# Remover configuração padrão do nginx (pode causar conflitos)
+RUN rm -f /etc/nginx/conf.d/default.conf
+
+# Copiar arquivos compilados do build
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Copiar configuração customizada do Nginx (se necessário)
+# Copiar configuração customizada do Nginx
+# IMPORTANTE: nginx.conf deve estar no diretório frontend/
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Copiar script de entrada
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+# Verificar se os arquivos foram copiados corretamente (debug)
+RUN echo "=== Verificando arquivos HTML ===" && \
+    ls -la /usr/share/nginx/html/ && \
+    echo "=== Verificando index.html ===" && \
+    test -f /usr/share/nginx/html/index.html && echo "✓ index.html existe" || echo "✗ index.html NÃO existe" && \
+    echo "=== Verificando assets ===" && \
+    ls -la /usr/share/nginx/html/assets/ 2>/dev/null || echo "Pasta assets não encontrada" && \
+    echo "=== Verificando configuração nginx ===" && \
+    ls -la /etc/nginx/conf.d/ && \
+    echo "=== Testando configuração nginx ===" && \
+    nginx -t
 
 # Expor porta
 EXPOSE 80
@@ -31,5 +55,6 @@ EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost/ || exit 1
 
-# Nginx já inicia automaticamente, não precisa de CMD
+# Usar script de entrada customizado
+ENTRYPOINT ["/docker-entrypoint.sh"]
 

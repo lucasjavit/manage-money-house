@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  base: '/', // Garantir que o base path seja raiz
   server: {
     port: 3001,
     proxy: {
