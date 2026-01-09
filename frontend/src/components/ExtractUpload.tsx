@@ -782,48 +782,25 @@ const ExtractUpload = () => {
             </div>
           )}
 
-          {/* Sugestões e Alertas IA - Grid */}
-          <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Sugestões IA */}
-            {insights?.aiInsights?.suggestions && insights.aiInsights.suggestions.length > 0 && (
-              <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 border-2 border-green-200 shadow-sm">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-xl">💡</span>
-                  <h3 className="text-base font-bold text-green-800">Dicas Inteligentes</h3>
-                </div>
-                <div className="space-y-2">
-                  {insights.aiInsights.suggestions.slice(0, 3).map((suggestion: string, idx: number) => (
-                    <div key={idx} className="bg-white/70 rounded-lg p-3 border border-green-100">
-                      <p className="text-sm text-slate-700 flex items-start gap-2">
-                        <span className="text-green-600 font-bold text-lg leading-none">✓</span>
-                        <span className="flex-1">{suggestion}</span>
-                      </p>
-                    </div>
-                  ))}
-                </div>
+          {/* Alertas IA */}
+          {insights?.aiInsights?.warnings && insights.aiInsights.warnings.length > 0 && (
+            <div className="mt-6 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl p-4 border-2 border-yellow-300 shadow-sm">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xl">⚠️</span>
+                <h3 className="text-base font-bold text-orange-800">Pontos de Atenção</h3>
               </div>
-            )}
-
-            {/* Alertas */}
-            {insights?.aiInsights?.warnings && insights.aiInsights.warnings.length > 0 && (
-              <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl p-4 border-2 border-yellow-300 shadow-sm">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-xl">⚠️</span>
-                  <h3 className="text-base font-bold text-orange-800">Pontos de Atenção</h3>
-                </div>
-                <div className="space-y-2">
-                  {insights.aiInsights.warnings.slice(0, 2).map((warning: string, idx: number) => (
-                    <div key={idx} className="bg-white/70 rounded-lg p-3 border border-orange-200">
-                      <p className="text-sm text-slate-700 flex items-start gap-2">
-                        <span className="text-orange-600 font-bold text-lg leading-none">!</span>
-                        <span className="flex-1">{warning}</span>
-                      </p>
-                    </div>
-                  ))}
-                </div>
+              <div className="space-y-2">
+                {insights.aiInsights.warnings.slice(0, 3).map((warning: string, idx: number) => (
+                  <div key={idx} className="bg-white/70 rounded-lg p-3 border border-orange-200">
+                    <p className="text-sm text-slate-700 flex items-start gap-2">
+                      <span className="text-orange-600 font-bold text-lg leading-none">!</span>
+                      <span className="flex-1">{warning}</span>
+                    </p>
+                  </div>
+                ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
 
