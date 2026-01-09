@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { expenseService } from '../services/expenseService';
 import { recurringExpenseService } from '../services/recurringExpenseService';
-import type { Expense, ExpenseRequest, ExpenseType } from '../types';
+import type { Expense, ExpenseRequest, ExpenseType, ExpenseAlertsResponse } from '../types';
 import RecurringExpenseButton from './RecurringExpenseButton';
 
 const ExpenseSheet = () => {
@@ -22,6 +22,9 @@ const ExpenseSheet = () => {
   const [paidMonths, setPaidMonths] = useState<Set<string>>(new Set());
   const [showAddTypeModal, setShowAddTypeModal] = useState(false);
   const [newTypeName, setNewTypeName] = useState('');
+  const [alerts, setAlerts] = useState<ExpenseAlertsResponse | null>(null);
+  const [loadingAlerts, setLoadingAlerts] = useState(false);
+  const [showAlerts, setShowAlerts] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const monthNames = [
@@ -48,6 +51,13 @@ const ExpenseSheet = () => {
     }
   }, [year]);
 
+  useEffect(() => {
+    // Carregar alertas quando o mês ou ano mudarem
+    if (user) {
+      loadAlerts();
+    }
+  }, [selectedMonth, year, user]);
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -61,6 +71,19 @@ const ExpenseSheet = () => {
       console.error('Error loading data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAlerts = async () => {
+    if (!user) return;
+    setLoadingAlerts(true);
+    try {
+      const alertsData = await expenseService.getExpenseAlerts(user.id, year, selectedMonth);
+      setAlerts(alertsData);
+    } catch (error) {
+      console.error('Error loading alerts:', error);
+    } finally {
+      setLoadingAlerts(false);
     }
   };
 
@@ -353,6 +376,138 @@ const ExpenseSheet = () => {
 
   return (
     <div className="space-y-6">
+      {/* Alertas Inteligentes */}
+      {alerts && alerts.alerts.length > 0 && showAlerts && (
+        <div className="bg-gradient-to-br from-orange-50 via-yellow-50 to-red-50 rounded-2xl shadow-lg border-2 border-orange-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-md ${
+                alerts.summary.overallStatus === 'critical' ? 'bg-gradient-to-br from-red-500 to-red-600' :
+                alerts.summary.overallStatus === 'attention' ? 'bg-gradient-to-br from-yellow-500 to-orange-500' :
+                'bg-gradient-to-br from-green-500 to-green-600'
+              }`}>
+                <span className="text-3xl">
+                  {alerts.summary.overallStatus === 'critical' ? '🚨' :
+                   alerts.summary.overallStatus === 'attention' ? '⚠️' : '✅'}
+                </span>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-slate-800">Alertas Inteligentes</h2>
+                <p className="text-sm text-slate-600">
+                  {alerts.summary.totalAlerts} alerta{alerts.summary.totalAlerts !== 1 ? 's' : ''} detectado{alerts.summary.totalAlerts !== 1 ? 's' : ''} para {
+                    ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'][selectedMonth - 1]
+                  } {year}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowAlerts(false)}
+              className="text-slate-500 hover:text-slate-700 p-2 hover:bg-white/50 rounded-lg transition-colors"
+              title="Fechar alertas"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Resumo */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+            <div className="bg-white/70 rounded-lg p-3 border border-orange-200">
+              <p className="text-xs font-semibold text-slate-600 uppercase">Total do Mês</p>
+              <p className="text-lg font-bold text-slate-800">
+                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(alerts.summary.totalMonthSpent)}
+              </p>
+            </div>
+            <div className="bg-white/70 rounded-lg p-3 border border-orange-200">
+              <p className="text-xs font-semibold text-slate-600 uppercase">Média Histórica</p>
+              <p className="text-lg font-bold text-slate-800">
+                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(alerts.summary.averageMonthSpent)}
+              </p>
+            </div>
+            <div className="bg-white/70 rounded-lg p-3 border border-orange-200">
+              <p className="text-xs font-semibold text-slate-600 uppercase">Diferença</p>
+              <p className={`text-lg font-bold ${
+                alerts.summary.totalMonthSpent > alerts.summary.averageMonthSpent ? 'text-red-600' : 'text-green-600'
+              }`}>
+                {alerts.summary.totalMonthSpent > alerts.summary.averageMonthSpent ? '+' : ''}
+                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(
+                  alerts.summary.totalMonthSpent - alerts.summary.averageMonthSpent
+                )}
+              </p>
+            </div>
+          </div>
+
+          {/* Lista de Alertas */}
+          <div className="space-y-3">
+            {alerts.alerts.slice(0, 5).map((alert, idx) => (
+              <div
+                key={idx}
+                className={`bg-white rounded-lg p-4 border-2 shadow-sm hover:shadow-md transition-shadow ${
+                  alert.severity === 'critical' ? 'border-red-300 bg-red-50/50' :
+                  alert.severity === 'warning' ? 'border-yellow-300 bg-yellow-50/50' :
+                  'border-slate-200'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <span className="text-3xl flex-shrink-0">{alert.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-bold text-slate-900">{alert.expenseTypeName}</h3>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                        alert.severity === 'critical' ? 'bg-red-200 text-red-700' :
+                        alert.severity === 'warning' ? 'bg-yellow-200 text-yellow-800' :
+                        'bg-slate-200 text-slate-700'
+                      }`}>
+                        {alert.severity === 'critical' ? 'CRÍTICO' :
+                         alert.severity === 'warning' ? 'ATENÇÃO' : 'INFO'}
+                      </span>
+                      {alert.isHistoricalMax && (
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-200 text-purple-700">
+                          RECORDE
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm mb-2">
+                      <div>
+                        <span className="text-slate-600">Atual: </span>
+                        <span className="font-bold text-red-600">
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(alert.currentValue)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-600">Média: </span>
+                        <span className="font-semibold text-slate-700">
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(alert.averageValue)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-600">Variação: </span>
+                        <span className={`font-bold ${alert.percentageAboveAverage > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          {alert.percentageAboveAverage > 0 ? '+' : ''}{alert.percentageAboveAverage.toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-sm text-slate-700 italic">{alert.suggestion}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Botão para reabrir alertas se estiver oculto */}
+      {alerts && alerts.alerts.length > 0 && !showAlerts && (
+        <button
+          onClick={() => setShowAlerts(true)}
+          className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 rounded-xl font-semibold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
+        >
+          <span className="text-xl">🚨</span>
+          Mostrar Alertas Inteligentes ({alerts.summary.totalAlerts})
+        </button>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <div className="bg-gradient-to-br from-blue-50 via-blue-50/50 to-blue-100/80 p-6 rounded-2xl shadow-md border-2 border-blue-200/60 hover:shadow-lg transition-shadow backdrop-blur-sm">
           <div className="flex items-start justify-between">

@@ -264,3 +264,31 @@ export interface QuickStat {
   icon: string;
   color: string;
 }
+
+export interface ExpenseAlertsResponse {
+  month: number;
+  year: number;
+  alerts: ExpenseAlert[];
+  summary: AlertsSummary;
+}
+
+export interface ExpenseAlert {
+  severity: 'critical' | 'warning' | 'normal';
+  expenseTypeName: string;
+  currentValue: number;
+  averageValue: number;
+  maxHistoricalValue: number;
+  percentageAboveAverage: number;
+  isHistoricalMax: boolean;
+  suggestion: string;
+  icon: string;
+}
+
+export interface AlertsSummary {
+  totalAlerts: number;
+  criticalCount: number;
+  warningCount: number;
+  totalMonthSpent: number;
+  averageMonthSpent: number;
+  overallStatus: 'good' | 'attention' | 'critical';
+}

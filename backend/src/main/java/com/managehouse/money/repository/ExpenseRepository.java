@@ -31,6 +31,9 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
     @Query("SELECT e FROM Expense e WHERE e.year = :year AND e.month = :month")
     List<Expense> findByYearAndMonth(@Param("year") Integer year, @Param("month") Integer month);
 
+    @Query("SELECT e FROM Expense e WHERE e.user.id = :userId AND e.year = :year AND e.month = :month")
+    List<Expense> findByUserIdAndMonthAndYear(@Param("userId") Long userId, @Param("month") Integer month, @Param("year") Integer year);
+
     @Query("SELECT COUNT(e) FROM Expense e WHERE e.expenseType.id = :expenseTypeId")
     long countByExpenseTypeId(@Param("expenseTypeId") Long expenseTypeId);
 }

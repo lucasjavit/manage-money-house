@@ -1,7 +1,9 @@
 package com.managehouse.money.controller;
 
+import com.managehouse.money.dto.ExpenseAlertsResponse;
 import com.managehouse.money.dto.ExpenseRequest;
 import com.managehouse.money.dto.ExpenseResponse;
+import com.managehouse.money.service.ExpenseAlertsService;
 import com.managehouse.money.service.ExpenseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +16,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ExpenseController {
     private final ExpenseService expenseService;
+    private final ExpenseAlertsService expenseAlertsService;
 
     @GetMapping
     public ResponseEntity<List<ExpenseResponse>> getExpenses(
@@ -37,6 +40,14 @@ public class ExpenseController {
             @RequestParam Integer year,
             @RequestParam Integer month) {
         return ResponseEntity.ok(expenseService.calculateLucasDebt(year, month));
+    }
+
+    @GetMapping("/alerts")
+    public ResponseEntity<ExpenseAlertsResponse> getExpenseAlerts(
+            @RequestParam Long userId,
+            @RequestParam Integer year,
+            @RequestParam Integer month) {
+        return ResponseEntity.ok(expenseAlertsService.generateAlerts(userId, month, year));
     }
 }
 

@@ -1,4 +1,4 @@
-import type { Expense, ExpenseRequest, ExpenseType } from '../types';
+import type { Expense, ExpenseRequest, ExpenseType, ExpenseAlertsResponse } from '../types';
 import api from './api';
 
 export const expenseService = {
@@ -28,6 +28,11 @@ export const expenseService = {
 
   deleteExpenseType: async (id: number): Promise<void> => {
     await api.delete(`/expense-types/${id}`);
+  },
+
+  getExpenseAlerts: async (userId: number, year: number, month: number): Promise<ExpenseAlertsResponse> => {
+    const response = await api.get<ExpenseAlertsResponse>(`/expenses/alerts?userId=${userId}&year=${year}&month=${month}`);
+    return response.data;
   },
 };
 
