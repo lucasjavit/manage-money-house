@@ -217,3 +217,50 @@ export interface SalaryConversionResponse {
   vet: number;
   finalAmountBRL: number;
 }
+
+export interface ExpenseInsightsResponse {
+  totalSpent: number;
+  totalTransactions: number;
+  averagePerTransaction?: number;
+  mostExpensiveDay?: string;
+  mostActiveCategory?: string;
+  categories: CategorySummary[];
+  topExpenses: TopExpense[];
+  aiInsights?: AIInsights;
+  trends?: Trend[];
+  quickStats?: QuickStat[];
+}
+
+export interface CategorySummary {
+  categoryName: string;
+  total: number;
+  count: number;
+  percentage: number;
+}
+
+export interface TopExpense {
+  description: string;
+  amount: number;
+  categoryName: string;
+  date: string;
+}
+
+export interface AIInsights {
+  summary?: string;
+  suggestions?: string[];
+  warnings?: string[];
+  analysis?: string;
+}
+
+export interface Trend {
+  description: string;
+  value: string;
+  type: 'increase' | 'decrease' | 'stable';
+}
+
+export interface QuickStat {
+  label: string;
+  value: string;
+  icon: string;
+  color: string;
+}

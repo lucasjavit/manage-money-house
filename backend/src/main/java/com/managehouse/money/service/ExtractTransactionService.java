@@ -8,7 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.managehouse.money.dto.ExtractTransactionResponse;
 import com.managehouse.money.dto.IdentifiedTransaction;
-import com.managehouse.money.entity.ExpenseType;
+import com.managehouse.money.entity.ExtractExpenseType;
 import com.managehouse.money.entity.ExtractTransaction;
 import com.managehouse.money.entity.User;
 import com.managehouse.money.repository.ExtractTransactionRepository;
@@ -22,7 +22,8 @@ import lombok.extern.slf4j.Slf4j;
 public class ExtractTransactionService {
     private final ExtractTransactionRepository extractTransactionRepository;
     private final UserService userService;
-    private final ExpenseTypeService expenseTypeService;
+    private final ExtractExpenseTypeService extractExpenseTypeService;
+    private final ExtractService extractService;
 
     @Transactional
     public List<ExtractTransactionResponse> saveTransactions(Long userId, List<IdentifiedTransaction> transactions) {
@@ -38,27 +39,60 @@ public class ExtractTransactionService {
 
         List<ExtractTransactionResponse> savedResponses = new java.util.ArrayList<>();
         
-        for (IdentifiedTransaction transaction : transactions) {
+        for (IdentifiedTransaction originalTransaction : transactions) {
             try {
-                log.debug("Processando transação: {}", transaction.getDescription());
-                log.debug("  - ExpenseTypeId: {}", transaction.getExpenseTypeId());
-                log.debug("  - Amount: {}", transaction.getAmount());
-                log.debug("  - Date: {}", transaction.getDate());
+                log.debug("Processando transação: {}", originalTransaction.getDescription());
+                log.debug("  - ExpenseTypeId: {}", originalTransaction.getExpenseTypeId());
+                log.debug("  - ExpenseTypeName: {}", originalTransaction.getExpenseTypeName());
+                log.debug("  - Confidence: {}", originalTransaction.getConfidence());
+                log.debug("  - Amount: {}", originalTransaction.getAmount());
+                log.debug("  - Date: {}", originalTransaction.getDate());
                 
-                ExpenseType expenseType = expenseTypeService.findById(transaction.getExpenseTypeId())
+                // Melhorar identificação do tipo usando IA para pesquisar/analisar o nome da transação
+                // Sempre tentar melhorar, especialmente quando confiança for baixa ou tipo for "Outros"
+                IdentifiedTransaction transactionToUse = originalTransaction;
+                boolean shouldImprove = (originalTransaction.getConfidence() != null && 
+                        ("low".equalsIgnoreCase(originalTransaction.getConfidence()) || 
+                         "medium".equalsIgnoreCase(originalTransaction.getConfidence()))) ||
+                        (originalTransaction.getExpenseTypeName() != null && 
+                         "Outros".equalsIgnoreCase(originalTransaction.getExpenseTypeName()));
+                
+                if (shouldImprove) {
+                    log.info("Melhorando identificação do tipo usando IA para transação: {}", originalTransaction.getDescription());
+                    try {
+                        IdentifiedTransaction improved = extractService.improveTransactionTypeWithAI(originalTransaction);
+                        if (improved != null && improved.getExpenseTypeId() != null && 
+                            improved.getExpenseTypeName() != null) {
+                            String oldType = originalTransaction.getExpenseTypeName();
+                            transactionToUse = improved;
+                            log.info("Tipo melhorado via IA: '{}' -> '{}' ({} -> {})", 
+                                originalTransaction.getDescription(),
+                                oldType, 
+                                improved.getExpenseTypeName(),
+                                improved.getConfidence());
+                        }
+                    } catch (Exception e) {
+                        log.warn("Erro ao melhorar tipo com IA, usando tipo original: {}", e.getMessage());
+                    }
+                }
+                
+                final IdentifiedTransaction finalTransaction = transactionToUse;
+                final Long expenseTypeId = finalTransaction.getExpenseTypeId();
+                
+                ExtractExpenseType extractExpenseType = extractExpenseTypeService.findById(expenseTypeId)
                         .orElseThrow(() -> {
-                            log.error("ERRO: ExpenseType não encontrado com ID: {}", transaction.getExpenseTypeId());
-                            return new RuntimeException("Expense type not found: " + transaction.getExpenseTypeId());
+                            log.error("ERRO: ExtractExpenseType não encontrado com ID: {}", expenseTypeId);
+                            return new RuntimeException("Extract expense type not found: " + expenseTypeId);
                         });
                 
-                log.debug("  - ExpenseType encontrado: {} (ID: {})", expenseType.getName(), expenseType.getId());
+                log.debug("  - ExtractExpenseType encontrado: {} (ID: {})", extractExpenseType.getName(), extractExpenseType.getId());
 
                 ExtractTransaction extractTransaction = new ExtractTransaction();
                 extractTransaction.setUser(user);
-                extractTransaction.setExpenseType(expenseType);
-                extractTransaction.setDescription(transaction.getDescription());
-                extractTransaction.setAmount(transaction.getAmount());
-                extractTransaction.setTransactionDate(transaction.getDate());
+                extractTransaction.setExtractExpenseType(extractExpenseType);
+                extractTransaction.setDescription(finalTransaction.getDescription());
+                extractTransaction.setAmount(finalTransaction.getAmount());
+                extractTransaction.setTransactionDate(finalTransaction.getDate());
 
                 log.debug("  - Salvando no banco...");
                 ExtractTransaction saved = extractTransactionRepository.save(extractTransaction);
@@ -74,8 +108,8 @@ public class ExtractTransactionService {
                 
                 savedResponses.add(toResponse(saved));
             } catch (Exception e) {
-                log.error("ERRO ao salvar transação: {}", transaction.getDescription(), e);
-                throw new RuntimeException("Erro ao salvar transação: " + transaction.getDescription() + " - " + e.getMessage(), e);
+                log.error("ERRO ao salvar transação: {}", originalTransaction.getDescription(), e);
+                throw new RuntimeException("Erro ao salvar transação: " + originalTransaction.getDescription() + " - " + e.getMessage(), e);
             }
         }
         
@@ -137,6 +171,64 @@ public class ExtractTransactionService {
         extractTransactionRepository.deleteById(id);
         log.info("Transação de extrato com ID {} deletada com sucesso", id);
     }
+    
+    @Transactional
+    public void deleteTransactions(List<Long> ids) {
+        log.info("Deletando {} transações de extrato", ids.size());
+        extractTransactionRepository.deleteAllById(ids);
+        log.info("{} transações deletadas com sucesso", ids.size());
+    }
+    
+    @Transactional
+    public ExtractTransactionResponse updateTransactionType(Long id, Long expenseTypeId) {
+        log.info("Atualizando tipo da transação {} para expenseTypeId {}", id, expenseTypeId);
+        
+        ExtractTransaction transaction = extractTransactionRepository.findById(id)
+                .orElseThrow(() -> {
+                    log.error("ERRO: Transação não encontrada com ID: {}", id);
+                    return new RuntimeException("Transaction not found: " + id);
+                });
+        
+        ExtractExpenseType extractExpenseType = extractExpenseTypeService.findById(expenseTypeId)
+                .orElseThrow(() -> {
+                    log.error("ERRO: ExtractExpenseType não encontrado com ID: {}", expenseTypeId);
+                    return new RuntimeException("Extract expense type not found: " + expenseTypeId);
+                });
+        
+        transaction.setExtractExpenseType(extractExpenseType);
+        ExtractTransaction saved = extractTransactionRepository.save(transaction);
+        
+        log.info("Tipo da transação {} atualizado para {}", id, extractExpenseType.getName());
+        return toResponse(saved);
+    }
+    
+    @Transactional
+    public List<ExtractTransactionResponse> updateTransactionsType(List<Long> ids, Long expenseTypeId) {
+        log.info("Atualizando tipo de {} transações para expenseTypeId {}", ids.size(), expenseTypeId);
+        
+        ExtractExpenseType extractExpenseType = extractExpenseTypeService.findById(expenseTypeId)
+                .orElseThrow(() -> {
+                    log.error("ERRO: ExtractExpenseType não encontrado com ID: {}", expenseTypeId);
+                    return new RuntimeException("Extract expense type not found: " + expenseTypeId);
+                });
+        
+        List<ExtractTransaction> transactions = extractTransactionRepository.findAllById(ids);
+        
+        if (transactions.size() != ids.size()) {
+            log.warn("Algumas transações não foram encontradas. Esperado: {}, Encontrado: {}", ids.size(), transactions.size());
+        }
+        
+        transactions.forEach(transaction -> {
+            transaction.setExtractExpenseType(extractExpenseType);
+        });
+        
+        List<ExtractTransaction> saved = extractTransactionRepository.saveAll(transactions);
+        
+        log.info("{} transações atualizadas com sucesso", saved.size());
+        return saved.stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
 
     private ExtractTransactionResponse toResponse(ExtractTransaction transaction) {
         return new ExtractTransactionResponse(
@@ -144,8 +236,8 @@ public class ExtractTransactionService {
                 transaction.getUser().getId(),
                 transaction.getUser().getName(),
                 transaction.getUser().getColor(),
-                transaction.getExpenseType().getId(),
-                transaction.getExpenseType().getName(),
+                transaction.getExtractExpenseType().getId(),
+                transaction.getExtractExpenseType().getName(),
                 transaction.getDescription(),
                 transaction.getAmount(),
                 transaction.getTransactionDate(),

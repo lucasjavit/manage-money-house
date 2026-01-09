@@ -792,12 +792,27 @@ const ExtractUpload = () => {
                           </span>
                         </div>
                       </div>
-                      <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+                      <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden mb-2">
                         <div
                           className={`bg-gradient-to-r ${colors[idx % colors.length]} h-2.5 rounded-full transition-all duration-500 shadow-sm`}
                           style={{ width: `${Math.min(cat.percentage, 100)}%` }}
                         ></div>
                       </div>
+                      {cat.highestExpense && (
+                        <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-200">
+                          <span className="text-slate-600 flex items-center gap-1">
+                            <span className="text-sm">⬆️</span>
+                            Maior gasto:
+                          </span>
+                          <span className="font-bold text-slate-700">
+                            {new Intl.NumberFormat('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                              maximumFractionDigits: 0,
+                            }).format(cat.highestExpense)}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

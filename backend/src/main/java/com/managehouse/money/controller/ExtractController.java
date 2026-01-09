@@ -3,8 +3,10 @@ package com.managehouse.money.controller;
 import com.managehouse.money.dto.ExtractProcessResponse;
 import com.managehouse.money.dto.ExtractTransactionResponse;
 import com.managehouse.money.dto.ExtractUploadRequest;
+import com.managehouse.money.dto.ExpenseInsightsResponse;
 import com.managehouse.money.dto.IdentifiedTransaction;
 import com.managehouse.money.dto.SaveTransactionsRequest;
+import com.managehouse.money.service.ExpenseInsightsService;
 import com.managehouse.money.service.ExtractService;
 import com.managehouse.money.service.ExtractTransactionService;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +23,7 @@ import java.util.List;
 public class ExtractController {
     private final ExtractService extractService;
     private final ExtractTransactionService extractTransactionService;
+    private final ExpenseInsightsService expenseInsightsService;
     
     @PostMapping("/process")
     public ResponseEntity<ExtractProcessResponse> processExtract(
@@ -111,6 +114,49 @@ public class ExtractController {
     public ResponseEntity<Void> deleteTransaction(@PathVariable Long id) {
         extractTransactionService.deleteTransaction(id);
         return ResponseEntity.noContent().build();
+    }
+    
+    @DeleteMapping("/transactions")
+    public ResponseEntity<Void> deleteTransactions(@RequestBody List<Long> ids) {
+        log.info("DELETE /transactions - Deletando {} transações", ids.size());
+        extractTransactionService.deleteTransactions(ids);
+        return ResponseEntity.noContent().build();
+    }
+    
+    @PutMapping("/transactions/{id}/type")
+    public ResponseEntity<ExtractTransactionResponse> updateTransactionType(
+            @PathVariable Long id,
+            @RequestBody java.util.Map<String, Long> request) {
+        Long expenseTypeId = request.get("expenseTypeId");
+        log.info("PUT /transactions/{}/type - Atualizando tipo para {}", id, expenseTypeId);
+        ExtractTransactionResponse response = extractTransactionService.updateTransactionType(id, expenseTypeId);
+        return ResponseEntity.ok(response);
+    }
+    
+    @PutMapping("/transactions/type")
+    public ResponseEntity<List<ExtractTransactionResponse>> updateTransactionsType(
+            @RequestBody java.util.Map<String, Object> request) {
+        @SuppressWarnings("unchecked")
+        List<Long> ids = (List<Long>) request.get("ids");
+        Long expenseTypeId = ((Number) request.get("expenseTypeId")).longValue();
+        log.info("PUT /transactions/type - Atualizando {} transações para tipo {}", ids.size(), expenseTypeId);
+        List<ExtractTransactionResponse> responses = extractTransactionService.updateTransactionsType(ids, expenseTypeId);
+        return ResponseEntity.ok(responses);
+    }
+    
+    @GetMapping("/insights")
+    public ResponseEntity<ExpenseInsightsResponse> getInsights(
+            @RequestParam Long userId,
+            @RequestParam Integer month,
+            @RequestParam Integer year) {
+        log.info("GET /insights - UserId: {}, Month: {}, Year: {}", userId, month, year);
+        try {
+            ExpenseInsightsResponse insights = expenseInsightsService.generateInsights(userId, month, year);
+            return ResponseEntity.ok(insights);
+        } catch (Exception e) {
+            log.error("Erro ao gerar insights", e);
+            return ResponseEntity.status(500).build();
+        }
     }
     
     private boolean validateTransaction(IdentifiedTransaction transaction) {

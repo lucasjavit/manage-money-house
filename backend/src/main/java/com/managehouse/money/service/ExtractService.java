@@ -27,8 +27,8 @@ import com.managehouse.money.dto.ExtractUploadRequest;
 import com.managehouse.money.dto.IdentifiedTransaction;
 import com.managehouse.money.dto.OpenAIRequest;
 import com.managehouse.money.dto.OpenAIResponse;
-import com.managehouse.money.entity.ExpenseType;
-import com.managehouse.money.repository.ExpenseTypeRepository;
+import com.managehouse.money.entity.ExtractExpenseType;
+import com.managehouse.money.repository.ExtractExpenseTypeRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,7 +39,7 @@ import lombok.extern.slf4j.Slf4j;
 public class ExtractService {
     
     private final ConfigurationService configurationService;
-    private final ExpenseTypeRepository expenseTypeRepository;
+    private final ExtractExpenseTypeRepository extractExpenseTypeRepository;
     
     @Value("${openai.api.url:https://api.openai.com/v1/chat/completions}")
     private String apiUrl;
@@ -48,6 +48,169 @@ public class ExtractService {
     private String model;
     
     private WebClient webClient;
+    
+    /**
+     * Melhora a identificação do tipo de transação usando IA para pesquisar/analisar o nome da transação
+     */
+    public IdentifiedTransaction improveTransactionTypeWithAI(IdentifiedTransaction transaction) {
+        if (transaction == null || transaction.getDescription() == null) {
+            return transaction;
+        }
+        
+        String apiKey = configurationService.getOpenAIKey();
+        if (apiKey == null || apiKey.isEmpty()) {
+            log.warn("OpenAI API key não configurada para melhorar identificação");
+            return transaction;
+        }
+        
+        try {
+            List<ExtractExpenseType> expenseTypes = extractExpenseTypeRepository.findAll();
+            String expenseTypesContext = expenseTypes.stream()
+                .map(et -> et.getId() + ": " + et.getName())
+                .collect(Collectors.joining(", "));
+            
+            String prompt = buildTypeIdentificationPrompt(transaction.getDescription(), expenseTypesContext, 
+                    transaction.getExpenseTypeName(), transaction.getConfidence());
+            
+            List<OpenAIRequest.Message> messages = new ArrayList<>();
+            messages.add(new OpenAIRequest.Message("system", 
+                "Você é um assistente especializado em identificar tipos de despesas baseado em nomes de transações bancárias. " +
+                "Use seu conhecimento sobre empresas, marcas e padrões comuns para identificar corretamente o tipo de despesa. " +
+                "Se necessário, faça uma análise semântica profunda do nome da transação."));
+            messages.add(new OpenAIRequest.Message("user", prompt));
+            
+            OpenAIRequest openAIRequest = new OpenAIRequest(model, messages, 0.3);
+            
+            if (webClient == null) {
+                webClient = WebClient.builder()
+                    .baseUrl(apiUrl)
+                    .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                    .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
+                    .build();
+            }
+            
+            OpenAIResponse response = webClient.post()
+                .bodyValue(openAIRequest)
+                .retrieve()
+                .bodyToMono(OpenAIResponse.class)
+                .block();
+            
+            if (response != null && 
+                response.getChoices() != null && 
+                !response.getChoices().isEmpty()) {
+                String content = response.getChoices().get(0).getMessage().getContent();
+                IdentifiedTransaction improved = parseTypeIdentificationResponse(content, transaction, expenseTypes);
+                if (improved != null) {
+                    log.info("Tipo melhorado para '{}': {} -> {}", 
+                        transaction.getDescription(), 
+                        transaction.getExpenseTypeName(), 
+                        improved.getExpenseTypeName());
+                    return improved;
+                }
+            }
+            
+        } catch (Exception e) {
+            log.warn("Erro ao melhorar tipo de transação com IA: {}", e.getMessage());
+        }
+        
+        return transaction;
+    }
+    
+    private String buildTypeIdentificationPrompt(String transactionName, String expenseTypesContext, 
+            String currentType, String currentConfidence) {
+        StringBuilder prompt = new StringBuilder();
+        prompt.append("Analise o seguinte nome de transação bancária e identifique o tipo de despesa mais apropriado.\n\n");
+        prompt.append("Nome da transação: ").append(transactionName).append("\n\n");
+        prompt.append("Tipo atual identificado: ").append(currentType != null ? currentType : "Não identificado").append("\n");
+        prompt.append("Confiança atual: ").append(currentConfidence != null ? currentConfidence : "N/A").append("\n\n");
+        prompt.append("Tipos de despesa disponíveis (ID: Nome): ").append(expenseTypesContext).append("\n\n");
+        
+        prompt.append("GUIA DE IDENTIFICAÇÃO:\n");
+        prompt.append("- Alimentação: supermercado, mercado, atacadão, carrefour, ifood, rappi, uber eats, delivery, restaurante, padaria\n");
+        prompt.append("- Moradia: aluguel, condomínio, luz, energia, água, gás, iptu, cemig, copel, enel, sanepar, sabesp, comgás\n");
+        prompt.append("- Saúde: farmácia, drogaria, hospital, clínica, médico, dentista, plano de saúde, unimed, amil\n");
+        prompt.append("- Automotivo: combustível, gasolina, posto, ipva, seguro auto, oficina, mecânico, estacionamento, shell, ipiranga\n");
+        prompt.append("- Transporte: uber, 99, taxi, passagem aérea, latam, gol, azul, ônibus, metrô, bilhete único\n");
+        prompt.append("- Educação: escola, colégio, universidade, faculdade, curso, mensalidade, material escolar, livraria\n");
+        prompt.append("- Lazer: cinema, teatro, show, viagem, hotel, airbnb, netflix, spotify, streaming, academia\n");
+        prompt.append("- Vestuário: roupa, moda, loja, shopping, calçado, zara, renner, riachuelo\n");
+        prompt.append("- Tecnologia: internet, banda larga, claro, vivo, celular, smartphone, computador, notebook, apple, samsung\n");
+        prompt.append("- Serviços: diarista, faxina, limpeza, manutenção, reparo, encanador, eletricista\n");
+        prompt.append("- Compras: amazon, mercado livre, magazine luiza, americanas, casas bahia, compra online\n");
+        prompt.append("- Financeiro: banco, tarifa, anuidade, juros, empréstimo, financiamento, cartão, fatura, pix, investimento\n");
+        prompt.append("- Pets: pet shop, veterinário, ração, animal, petz, cobasi\n");
+        prompt.append("- Outros: qualquer transação que não se encaixe nos tipos acima\n\n");
+        
+        prompt.append("INSTRUÇÕES:\n");
+        prompt.append("1. Analise SEMANTICAMENTE o nome da transação\n");
+        prompt.append("2. Use seu conhecimento sobre empresas, marcas e padrões comuns\n");
+        prompt.append("3. Se o tipo atual for 'Outros' ou a confiança for 'low', faça uma análise mais profunda\n");
+        prompt.append("4. Retorne APENAS um JSON válido no formato:\n");
+        prompt.append("{\n");
+        prompt.append("  \"expenseTypeId\": id_do_tipo,\n");
+        prompt.append("  \"expenseTypeName\": \"Nome do tipo EXATO (deve corresponder exatamente a um dos tipos disponíveis)\",\n");
+        prompt.append("  \"confidence\": \"high|medium|low\",\n");
+        prompt.append("  \"reasoning\": \"Breve explicação do porquê esse tipo foi escolhido\"\n");
+        prompt.append("}\n\n");
+        prompt.append("Retorne APENAS o JSON, sem texto adicional.\n");
+        
+        return prompt.toString();
+    }
+    
+    private IdentifiedTransaction parseTypeIdentificationResponse(String content, 
+            IdentifiedTransaction original, List<ExtractExpenseType> expenseTypes) {
+        try {
+            ObjectMapper objectMapper = new ObjectMapper();
+            String jsonContent = extractJSON(content);
+            if (jsonContent == null) {
+                return null;
+            }
+            
+            // Se for array, pegar o primeiro elemento
+            if (jsonContent.trim().startsWith("[")) {
+                List<Map<String, Object>> list = objectMapper.readValue(
+                    jsonContent, 
+                    new TypeReference<List<Map<String, Object>>>() {}
+                );
+                if (!list.isEmpty()) {
+                    jsonContent = objectMapper.writeValueAsString(list.get(0));
+                }
+            }
+            
+            Map<String, Object> result = objectMapper.readValue(jsonContent, 
+                new TypeReference<Map<String, Object>>() {});
+            
+            String expenseTypeName = (String) result.get("expenseTypeName");
+            String reasoning = (String) result.get("reasoning");
+            
+            // Validar se o tipo existe
+            if (expenseTypeName != null) {
+                Optional<ExtractExpenseType> matchedType = expenseTypes.stream()
+                    .filter(et -> et.getName().equalsIgnoreCase(expenseTypeName.trim()))
+                    .findFirst();
+                
+                if (matchedType.isPresent()) {
+                    IdentifiedTransaction improved = new IdentifiedTransaction();
+                    improved.setDescription(original.getDescription());
+                    improved.setAmount(original.getAmount());
+                    improved.setDate(original.getDate());
+                    improved.setExpenseTypeId(matchedType.get().getId());
+                    improved.setExpenseTypeName(matchedType.get().getName());
+                    improved.setConfidence((String) result.get("confidence"));
+                    
+                    log.info("Tipo melhorado para '{}': {} (Raciocínio: {})", 
+                        original.getDescription(), expenseTypeName, reasoning);
+                    
+                    return improved;
+                }
+            }
+            
+        } catch (Exception e) {
+            log.warn("Erro ao parsear resposta de identificação de tipo: {}", e.getMessage());
+        }
+        
+        return null;
+    }
     
     public ExtractProcessResponse processExtract(ExtractUploadRequest request) {
         try {
@@ -61,8 +224,8 @@ public class ExtractService {
                 );
             }
             
-            // 2. Obter tipos de despesa para contexto
-            List<ExpenseType> expenseTypes = expenseTypeRepository.findAll();
+            // 2. Obter tipos de despesa para contexto (usando tipos de extrato)
+            List<ExtractExpenseType> expenseTypes = extractExpenseTypeRepository.findAll();
             String expenseTypesContext = expenseTypes.stream()
                 .map(et -> et.getId() + ": " + et.getName())
                 .collect(Collectors.joining(", "));
@@ -125,7 +288,9 @@ public class ExtractService {
             List<OpenAIRequest.Message> messages = new ArrayList<>();
             messages.add(new OpenAIRequest.Message("system", 
                 "Você é um assistente especializado em análise de extratos bancários e cartões de crédito. " +
-                "Sua tarefa é identificar transações e categorizá-las corretamente."));
+                "Sua tarefa é identificar transações e categorizá-las corretamente analisando SEMANTICAMENTE o nome/descrição de cada transação. " +
+                "Use seu conhecimento sobre empresas, marcas e padrões comuns para identificar o tipo de despesa com precisão. " +
+                "Seja inteligente e contextual na identificação, não apenas busque palavras isoladas."));
             messages.add(new OpenAIRequest.Message("user", prompt));
             
             OpenAIRequest openAIRequest = new OpenAIRequest(model, messages, 0.3);
@@ -163,21 +328,80 @@ public class ExtractService {
         StringBuilder prompt = new StringBuilder();
         prompt.append("Analise o seguinte extrato bancário/cartão de crédito e identifique todas as transações.\n\n");
         prompt.append("Tipos de despesa disponíveis (ID: Nome): ").append(expenseTypesContext).append("\n\n");
-        prompt.append("GUIA DE MAPEAMENTO DE TIPOS (identifique pelo nome da transação):\n");
-        prompt.append("- Aluguel: palavras como 'aluguel', 'rent', 'locação', 'imobiliária'\n");
-        prompt.append("- Condomínio: 'condomínio', 'condominio', 'síndico', 'taxa condominial'\n");
-        prompt.append("- Luz: 'luz', 'energia', 'eletricidade', 'light', 'cemig', 'copel', 'enel'\n");
-        prompt.append("- Água: 'água', 'agua', 'sanepar', 'sabesp', 'caesb', 'copasa', 'water'\n");
-        prompt.append("- Gás: 'gás', 'gas', 'gás natural', 'comgás', 'petrobras'\n");
-        prompt.append("- IPTU: 'iptu', 'imposto predial', 'taxa urbana'\n");
-        prompt.append("- Internet: 'internet', 'banda larga', 'net', 'claro', 'vivo', 'oi', 'tim'\n");
-        prompt.append("- Mercado: 'supermercado', 'mercado', 'atacadão', 'carrefour', 'extra', 'pao de açucar', 'walmart', 'big', 'assai'\n");
-        prompt.append("- Marmitas: 'marmita', 'delivery', 'ifood', 'rappi', 'uber eats', 'comida delivery'\n");
-        prompt.append("- Saladas: 'salada', 'salad', 'healthy', 'verde'\n");
-        prompt.append("- Diarista: 'diarista', 'faxina', 'limpeza', 'empregada', 'doméstica'\n");
-        prompt.append("- Viagem: 'viagem', 'hotel', 'hospedagem', 'airbnb', 'booking', 'passagem', 'aéreo', 'avião'\n");
-        prompt.append("- Carro: 'combustível', 'gasolina', 'posto', 'ipva', 'seguro auto', 'oficina', 'mecânico', 'estacionamento'\n");
-        prompt.append("- Outros: qualquer transação que não se encaixe nos tipos acima\n\n");
+        prompt.append("GUIA DETALHADO DE IDENTIFICAÇÃO DE TIPOS (analise SEMANTICAMENTE o nome/descrição da transação):\n\n");
+        
+        prompt.append("1. ALIMENTAÇÃO - Identifique por:\n");
+        prompt.append("   - Palavras-chave: 'supermercado', 'mercado', 'atacadão', 'carrefour', 'extra', 'pao de açucar', 'walmart', 'big', 'assai', 'ifood', 'rappi', 'uber eats', 'delivery', 'marmita', 'restaurante', 'lanchonete', 'padaria', 'açougue', 'peixaria', 'hortifruti'\n");
+        prompt.append("   - Exemplos: 'CARREFOUR SUPERMERCADO', 'IFOOD DELIVERY', 'RESTAURANTE XYZ', 'PADARIA ABC'\n\n");
+        
+        prompt.append("2. MORADIA - Identifique por:\n");
+        prompt.append("   - Palavras-chave: 'aluguel', 'rent', 'locação', 'imobiliária', 'condomínio', 'condominio', 'síndico', 'iptu', 'imposto predial', 'luz', 'energia', 'eletricidade', 'água', 'agua', 'gás', 'gas', 'saneamento', 'cemig', 'copel', 'enel', 'sanepar', 'sabesp', 'comgás'\n");
+        prompt.append("   - Exemplos: 'ALUGUEL APTO', 'CONDOMÍNIO EDIFÍCIO', 'CEMIG ENERGIA', 'SANEPAR ÁGUA', 'IPTU 2025'\n\n");
+        
+        prompt.append("3. SAÚDE - Identifique por:\n");
+        prompt.append("   - Palavras-chave: 'farmácia', 'farmacia', 'drogaria', 'medicamento', 'remédio', 'hospital', 'clínica', 'clinica', 'médico', 'medico', 'dentista', 'laboratório', 'laboratorio', 'plano de saúde', 'unimed', 'amil', 'bradesco saúde'\n");
+        prompt.append("   - Exemplos: 'FARMÁCIA XYZ', 'HOSPITAL ABC', 'CLÍNICA MÉDICA', 'UNIMED'\n\n");
+        
+        prompt.append("4. AUTOMOTIVO - Identifique por:\n");
+        prompt.append("   - Palavras-chave: 'combustível', 'combustivel', 'gasolina', 'etanol', 'diesel', 'posto', 'shell', 'ipiranga', 'petrobras', 'ipva', 'seguro auto', 'oficina', 'mecânico', 'mecanico', 'estacionamento', 'parking', 'lavagem', 'auto peças'\n");
+        prompt.append("   - Exemplos: 'POSTO SHELL', 'IPVA 2025', 'SEGURO AUTO', 'OFICINA MECÂNICA', 'ESTACIONAMENTO'\n\n");
+        
+        prompt.append("5. TRANSPORTE - Identifique por:\n");
+        prompt.append("   - Palavras-chave: 'uber', '99', 'taxi', 'táxi', 'passagem', 'aéreo', 'aereo', 'avião', 'aviao', 'voo', 'flight', 'latam', 'gol', 'azul', 'tam', 'ônibus', 'onibus', 'metrô', 'metro', 'bilhete único'\n");
+        prompt.append("   - Exemplos: 'UBER', '99 POP', 'LATAM PASSAGEM', 'GOL AÉREO', 'BILHETE ÚNICO'\n\n");
+        
+        prompt.append("6. EDUCAÇÃO - Identifique por:\n");
+        prompt.append("   - Palavras-chave: 'escola', 'colégio', 'colegio', 'universidade', 'faculdade', 'curso', 'mensalidade', 'material escolar', 'livro', 'livraria', 'cursinho', 'preparatório'\n");
+        prompt.append("   - Exemplos: 'ESCOLA XYZ', 'FACULDADE ABC', 'CURSO DE INGLÊS', 'LIVRARIA'\n\n");
+        
+        prompt.append("7. LAZER - Identifique por:\n");
+        prompt.append("   - Palavras-chave: 'cinema', 'teatro', 'show', 'festival', 'parque', 'praia', 'viagem', 'travel', 'hotel', 'hospedagem', 'airbnb', 'booking', 'netflix', 'spotify', 'streaming', 'jogo', 'game', 'academia', 'ginástica'\n");
+        prompt.append("   - Exemplos: 'CINEMA', 'AIRBNB HOSPEDAGEM', 'NETFLIX', 'ACADEMIA XYZ'\n\n");
+        
+        prompt.append("8. VESTUÁRIO - Identifique por:\n");
+        prompt.append("   - Palavras-chave: 'roupa', 'vestuário', 'vestuario', 'moda', 'loja', 'shopping', 'calçado', 'calcado', 'sapato', 'sapataria', 'camiseta', 'calça', 'zara', 'renner', 'riachuelo', 'c&a'\n");
+        prompt.append("   - Exemplos: 'LOJA DE ROUPAS', 'ZARA', 'SAPATARIA XYZ', 'SHOPPING CENTER'\n\n");
+        
+        prompt.append("9. TECNOLOGIA - Identifique por:\n");
+        prompt.append("   - Palavras-chave: 'internet', 'banda larga', 'net', 'wi-fi', 'wifi', 'fibra', 'claro', 'vivo', 'oi', 'tim', 'gvt', 'virtua', 'celular', 'smartphone', 'computador', 'notebook', 'tablet', 'apple', 'samsung', 'magazine luiza', 'americanas', 'casas bahia'\n");
+        prompt.append("   - Exemplos: 'CLARO INTERNET', 'VIVO FIBRA', 'APPLE STORE', 'MAGAZINE LUIZA'\n\n");
+        
+        prompt.append("10. SERVIÇOS - Identifique por:\n");
+        prompt.append("    - Palavras-chave: 'diarista', 'faxina', 'limpeza', 'empregada', 'doméstica', 'domestica', 'housekeeping', 'cleaning', 'manutenção', 'manutencao', 'reparo', 'conserto', 'encanador', 'eletricista', 'pintor', 'pedreiro'\n");
+        prompt.append("    - Exemplos: 'DIARISTA MARIA', 'FAXINA SEMANAL', 'MANUTENÇÃO PREDIAL', 'ELETRICISTA'\n\n");
+        
+        prompt.append("11. COMPRAS - Identifique por:\n");
+        prompt.append("    - Palavras-chave: 'amazon', 'mercado livre', 'magazine luiza', 'americanas', 'casas bahia', 'extra', 'carrefour', 'walmart', 'compra online', 'e-commerce', 'marketplace', 'loja online'\n");
+        prompt.append("    - Exemplos: 'AMAZON', 'MERCADO LIVRE', 'MAGAZINE LUIZA', 'AMERICANAS'\n\n");
+        
+        prompt.append("12. FINANCEIRO - Identifique por:\n");
+        prompt.append("    - Palavras-chave: 'banco', 'tarifa', 'anuidade', 'juros', 'taxa', 'empréstimo', 'emprestimo', 'financiamento', 'cartão', 'cartao', 'fatura', 'boleto', 'pix', 'ted', 'doc', 'investimento', 'corretora'\n");
+        prompt.append("    - Exemplos: 'TARIFA BANCÁRIA', 'ANUIDADE CARTÃO', 'EMPRÉSTIMO', 'CORRETORA XYZ'\n\n");
+        
+        prompt.append("13. PETS - Identifique por:\n");
+        prompt.append("    - Palavras-chave: 'pet', 'pet shop', 'veterinário', 'veterinario', 'veterinária', 'veterinaria', 'ração', 'racao', 'animal', 'cachorro', 'gato', 'petz', 'cobasi'\n");
+        prompt.append("    - Exemplos: 'PET SHOP XYZ', 'VETERINÁRIA ABC', 'PETZ', 'COBASI'\n\n");
+        
+        prompt.append("14. CUIDADOS PESSOAIS - Identifique por:\n");
+        prompt.append("    - Palavras-chave: 'perfumaria', 'cosméticos', 'cosmeticos', 'maquiagem', 'creme', 'shampoo', 'condicionador', 'sabonete', 'desodorante', 'barbeiro', 'barbearia', 'salão', 'salao', 'beleza', 'estética', 'estetica', 'spa', 'massagem', 'manicure', 'pedicure', 'depilação', 'depilacao', 'cabeleireiro', 'corte de cabelo', 'tintura', 'alisamento', 'unhas', 'esmalte'\n");
+        prompt.append("    - Exemplos: 'PERFUMARIA XYZ', 'SALÃO DE BELEZA', 'BARBEARIA ABC', 'SPA RELAXAMENTO', 'MANICURE E PEDICURE', 'CABELEIREIRO'\n\n");
+        
+        prompt.append("15. DELIVERY - Identifique por:\n");
+        prompt.append("    - Palavras-chave: 'ifood', 'rappi', 'uber eats', 'delivery', 'entrega', 'pedido online', 'pedido delivery', 'app delivery', 'i food', 'rappi delivery', 'uber eats delivery', '99 food', 'pedidos já', 'pedidosja', 'aiquefome', 'ai que fome'\n");
+        prompt.append("    - Exemplos: 'IFOOD', 'RAPPI', 'UBER EATS', 'DELIVERY RESTAURANTE', 'PEDIDO ONLINE'\n\n");
+        
+        prompt.append("16. OUTROS - Use para:\n");
+        prompt.append("    - Qualquer transação que NÃO se encaixe claramente nos tipos acima\n");
+        prompt.append("    - Quando houver dúvida sobre o tipo\n");
+        prompt.append("    - Transações genéricas sem identificação clara\n\n");
+        
+        prompt.append("INSTRUÇÕES DE IDENTIFICAÇÃO:\n");
+        prompt.append("- Analise SEMANTICAMENTE o nome/descrição da transação, não apenas palavras isoladas\n");
+        prompt.append("- Considere o CONTEXTO e o SIGNIFICADO da transação\n");
+        prompt.append("- Preste atenção em variações de escrita (com/sem acentos, maiúsculas/minúsculas)\n");
+        prompt.append("- Identifique empresas e marcas conhecidas relacionadas a cada tipo\n");
+        prompt.append("- Se uma transação menciona múltiplos tipos, escolha o mais relevante ou o primeiro mencionado\n");
+        prompt.append("- Seja INTELIGENTE: 'POSTO IPIRANGA' = Carro, 'NET VIRTUA' = Internet, 'IFOOD' = Marmitas\n\n");
         prompt.append("Para cada transação identificada, retorne no seguinte formato JSON:\n");
         prompt.append("[\n");
         prompt.append("  {\n");
@@ -189,18 +413,28 @@ public class ExtractService {
         prompt.append("    \"confidence\": \"high|medium|low\"\n");
         prompt.append("  }\n");
         prompt.append("]\n\n");
-        prompt.append("Regras IMPORTANTES:\n");
-        prompt.append("- EXTRAIA a data COMPLETA (dia, mês e ano) de cada transação do extrato\n");
-        prompt.append("- Se a data estiver incompleta no extrato, use a data de referência do extrato (geralmente no cabeçalho)\n");
-        prompt.append("- Se não houver data específica, procure por períodos de referência no documento\n");
-        prompt.append("- IDENTIFIQUE o tipo de despesa analisando a DESCRIÇÃO/NOME da transação usando o guia acima\n");
-        prompt.append("- O expenseTypeName DEVE ser EXATAMENTE igual a um dos nomes disponíveis (case-sensitive)\n");
-        prompt.append("- Use o expenseTypeId correspondente ao tipo identificado\n");
-        prompt.append("- IMPORTANTE: Se não conseguir identificar claramente o tipo baseado na descrição, SEMPRE use 'Outros'\n");
-        prompt.append("- Quando em dúvida, prefira 'Outros' ao invés de tentar adivinhar\n");
-        prompt.append("- Valores devem ser positivos (já são despesas)\n");
-        prompt.append("- Seja preciso na identificação das datas - isso é crítico para salvar corretamente no banco de dados\n");
-        prompt.append("- Retorne APENAS o JSON válido, sem texto adicional antes ou depois\n\n");
+        prompt.append("REGRAS CRÍTICAS DE IDENTIFICAÇÃO:\n");
+        prompt.append("1. ANÁLISE SEMÂNTICA: Analise o SIGNIFICADO e CONTEXTO da descrição, não apenas palavras isoladas\n");
+        prompt.append("2. IDENTIFICAÇÃO INTELIGENTE: Use o conhecimento sobre empresas, marcas e padrões comuns\n");
+        prompt.append("3. PRECISÃO: O expenseTypeName DEVE ser EXATAMENTE igual a um dos nomes disponíveis (case-sensitive, com acentos)\n");
+        prompt.append("4. CONFIANÇA: Use 'high' quando tiver certeza, 'medium' quando provável, 'low' quando incerto\n");
+        prompt.append("5. QUANDO EM DÚVIDA: Se não conseguir identificar claramente, SEMPRE use 'Outros'\n");
+        prompt.append("6. DATAS: EXTRAIA a data COMPLETA (dia, mês e ano) de cada transação\n");
+        prompt.append("7. VALORES: Valores devem ser positivos (já são despesas)\n");
+        prompt.append("8. FORMATO: Retorne APENAS o JSON válido, sem texto adicional antes ou depois\n\n");
+        
+        prompt.append("EXEMPLOS DE IDENTIFICAÇÃO CORRETA:\n");
+        prompt.append("- 'POSTO IPIRANGA' → Automotivo\n");
+        prompt.append("- 'NET VIRTUA INTERNET' → Tecnologia\n");
+        prompt.append("- 'IFOOD DELIVERY' → Alimentação\n");
+        prompt.append("- 'CEMIG ENERGIA' → Moradia\n");
+        prompt.append("- 'SANEPAR ÁGUA' → Moradia\n");
+        prompt.append("- 'CARREFOUR SUPERMERCADO' → Alimentação\n");
+        prompt.append("- 'AIRBNB HOSPEDAGEM' → Lazer\n");
+        prompt.append("- 'CONDOMÍNIO EDIFÍCIO' → Moradia\n");
+        prompt.append("- 'UBER' → Transporte\n");
+        prompt.append("- 'FARMÁCIA XYZ' → Saúde\n");
+        prompt.append("- 'PET SHOP ABC' → Pets\n\n");
         prompt.append("Extrato:\n");
         prompt.append(text);
         
@@ -255,11 +489,11 @@ public class ExtractService {
                     transaction.setConfidence((String) raw.get("confidence"));
                     
                     // Validar e mapear tipo de despesa - se não conseguir identificar, usar "Outros"
-                    List<ExpenseType> expenseTypes = expenseTypeRepository.findAll();
+                    List<ExtractExpenseType> expenseTypes = extractExpenseTypeRepository.findAll();
                     
                     // Se expenseTypeId não foi fornecido, tentar mapear pelo nome
                     if (transaction.getExpenseTypeId() == null && expenseTypeName != null) {
-                        Optional<ExpenseType> matchedType = expenseTypes.stream()
+                        Optional<ExtractExpenseType> matchedType = expenseTypes.stream()
                             .filter(et -> et.getName().equalsIgnoreCase(expenseTypeName.trim()))
                             .findFirst();
                         
@@ -271,7 +505,7 @@ public class ExtractService {
                             Long mappedId = mapExpenseTypeByName(transaction.getDescription(), expenseTypes);
                             if (mappedId != null) {
                                 transaction.setExpenseTypeId(mappedId);
-                                ExpenseType matched = expenseTypes.stream()
+                                ExtractExpenseType matched = expenseTypes.stream()
                                     .filter(et -> et.getId().equals(mappedId))
                                     .findFirst()
                                     .orElse(null);
@@ -280,7 +514,7 @@ public class ExtractService {
                                 }
                             } else {
                                 // Se não conseguiu mapear, usar "Outros"
-                                Optional<ExpenseType> outrosType = expenseTypes.stream()
+                                Optional<ExtractExpenseType> outrosType = expenseTypes.stream()
                                     .filter(et -> et.getName().equalsIgnoreCase("Outros"))
                                     .findFirst();
                                 if (outrosType.isPresent()) {
@@ -294,7 +528,7 @@ public class ExtractService {
                     
                     // Se ainda não tem tipo, usar "Outros" como padrão
                     if (transaction.getExpenseTypeId() == null) {
-                        Optional<ExpenseType> outrosType = expenseTypes.stream()
+                        Optional<ExtractExpenseType> outrosType = expenseTypes.stream()
                             .filter(et -> et.getName().equalsIgnoreCase("Outros"))
                             .findFirst();
                         if (outrosType.isPresent()) {
@@ -323,89 +557,124 @@ public class ExtractService {
         return transactions;
     }
     
-    private Long mapExpenseTypeByName(String description, List<ExpenseType> expenseTypes) {
+    private Long mapExpenseTypeByName(String description, List<ExtractExpenseType> expenseTypes) {
         if (description == null) return null;
         
-        String descLower = description.toLowerCase();
+        String descLower = description.toLowerCase()
+                .replaceAll("[áàâãä]", "a")
+                .replaceAll("[éèêë]", "e")
+                .replaceAll("[íìîï]", "i")
+                .replaceAll("[óòôõö]", "o")
+                .replaceAll("[úùûü]", "u")
+                .replaceAll("[ç]", "c");
         
-        // Mapeamento por palavras-chave
-        for (ExpenseType type : expenseTypes) {
+        // Mapeamento por palavras-chave e empresas conhecidas
+        for (ExtractExpenseType type : expenseTypes) {
             String typeName = type.getName().toLowerCase();
             
             switch (typeName) {
-                case "aluguel":
-                    if (descLower.contains("aluguel") || descLower.contains("rent") || descLower.contains("locação") || descLower.contains("imobiliária")) {
+                case "alimentação":
+                case "alimentacao":
+                    if (containsAny(descLower, "supermercado", "mercado", "atacadao", "atacadão", "carrefour", "extra", "pao de acucar", "pao de açucar", 
+                            "walmart", "big", "assai", "makro", "sams", "costco", "ifood", "rappi", "uber eats", "delivery", "marmita", 
+                            "restaurante", "lanchonete", "padaria", "acougue", "açougue", "peixaria", "hortifruti", "comida")) {
                         return type.getId();
                     }
                     break;
-                case "condomínio":
-                    if (descLower.contains("condomínio") || descLower.contains("condominio") || descLower.contains("síndico")) {
+                case "moradia":
+                    if (containsAny(descLower, "aluguel", "rent", "locacao", "locação", "imobiliaria", "imobiliária", "rental", "lease",
+                            "condominio", "condomínio", "sindico", "síndico", "taxa condominial", "condo",
+                            "luz", "energia", "eletricidade", "electricity", "light", "eletrica",
+                            "cemig", "copel", "enel", "ceb", "celesc", "celpe", "coelba", "elektro", "ampla", "amazonas energia",
+                            "agua", "água", "water", "abastecimento", "saneamento", "sanepar", "sabesp", "caesb", "copasa", "caern", "cagece", "cesan", "cesp", "embasa", "caema",
+                            "gas", "gás", "gas natural", "gás natural", "gn", "glp", "comgas", "comgás", "petrobras", "copergas", "copergás", "scgas", "scgás", "sulgas", "sulgás", "ceg", "cigas",
+                            "iptu", "imposto predial", "imposto territorial", "taxa urbana", "taxa predial")) {
                         return type.getId();
                     }
                     break;
-                case "luz":
-                    if (descLower.contains("luz") || descLower.contains("energia") || descLower.contains("eletricidade") || 
-                        descLower.contains("cemig") || descLower.contains("copel") || descLower.contains("enel") || descLower.contains("light")) {
+                case "saúde":
+                case "saude":
+                    if (containsAny(descLower, "farmacia", "farmácia", "drogaria", "medicamento", "remedio", "remédio", "hospital", "clinica", "clínica", 
+                            "medico", "médico", "dentista", "laboratorio", "laboratório", "plano de saude", "plano de saúde", 
+                            "unimed", "amil", "bradesco saude", "bradesco saúde")) {
                         return type.getId();
                     }
                     break;
-                case "água":
-                    if (descLower.contains("água") || descLower.contains("agua") || descLower.contains("sanepar") || 
-                        descLower.contains("sabesp") || descLower.contains("caesb") || descLower.contains("copasa") || descLower.contains("water")) {
+                case "automotivo":
+                    if (containsAny(descLower, "combustivel", "combustível", "gasolina", "etanol", "diesel", "posto", "shell", "ipiranga", "petrobras", 
+                            "ipva", "seguro auto", "oficina", "mecanico", "mecânico", "estacionamento", "parking", "lavagem", "auto pecas", "auto peças", "texaco", "esso", "bp")) {
                         return type.getId();
                     }
                     break;
-                case "gás":
-                    if (descLower.contains("gás") || descLower.contains("gas") || descLower.contains("comgás") || descLower.contains("petrobras")) {
+                case "transporte":
+                    if (containsAny(descLower, "uber", "99", "taxi", "táxi", "passagem", "aereo", "aéreo", "aviao", "avião", "voo", "flight", 
+                            "latam", "gol", "azul", "tam", "onibus", "ônibus", "metro", "metrô", "bilhete unico", "bilhete único")) {
                         return type.getId();
                     }
                     break;
-                case "iptu":
-                    if (descLower.contains("iptu") || descLower.contains("imposto predial")) {
+                case "educação":
+                case "educacao":
+                    if (containsAny(descLower, "escola", "colegio", "colégio", "universidade", "faculdade", "curso", "mensalidade", "material escolar", 
+                            "livro", "livraria", "cursinho", "preparatorio", "preparatório")) {
                         return type.getId();
                     }
                     break;
-                case "internet":
-                    if (descLower.contains("internet") || descLower.contains("banda larga") || descLower.contains("net") || 
-                        descLower.contains("claro") || descLower.contains("vivo") || descLower.contains("oi") || descLower.contains("tim")) {
+                case "lazer":
+                    if (containsAny(descLower, "cinema", "teatro", "show", "festival", "parque", "praia", "viagem", "travel", "hotel", "hospedagem", 
+                            "airbnb", "booking", "netflix", "spotify", "streaming", "jogo", "game", "academia", "ginastica", "ginástica")) {
                         return type.getId();
                     }
                     break;
-                case "mercado":
-                    if (descLower.contains("supermercado") || descLower.contains("mercado") || descLower.contains("atacadão") || 
-                        descLower.contains("carrefour") || descLower.contains("extra") || descLower.contains("pao de açucar") || 
-                        descLower.contains("walmart") || descLower.contains("big") || descLower.contains("assai")) {
+                case "vestuário":
+                case "vestuario":
+                    if (containsAny(descLower, "roupa", "vestuario", "vestuário", "moda", "loja", "shopping", "calcado", "calçado", "sapato", "sapataria", 
+                            "camiseta", "calca", "calça", "zara", "renner", "riachuelo", "c&a", "c e a")) {
                         return type.getId();
                     }
                     break;
-                case "marmitas":
-                    if (descLower.contains("marmita") || descLower.contains("delivery") || descLower.contains("ifood") || 
-                        descLower.contains("rappi") || descLower.contains("uber eats")) {
+                case "tecnologia":
+                    if (containsAny(descLower, "internet", "banda larga", "net", "wi-fi", "wifi", "fibra", "claro", "vivo", "oi", "tim", "gvt", "virtua", 
+                            "celular", "smartphone", "computador", "notebook", "tablet", "apple", "samsung", "magazine luiza", "americanas", "casas bahia")) {
                         return type.getId();
                     }
                     break;
-                case "saladas":
-                    if (descLower.contains("salada") || descLower.contains("salad") || descLower.contains("healthy")) {
+                case "serviços":
+                case "servicos":
+                    if (containsAny(descLower, "diarista", "faxina", "limpeza", "empregada", "domestica", "doméstica", "housekeeping", "cleaning", 
+                            "manutencao", "manutenção", "reparo", "conserto", "encanador", "eletricista", "pintor", "pedreiro")) {
                         return type.getId();
                     }
                     break;
-                case "diarista":
-                    if (descLower.contains("diarista") || descLower.contains("faxina") || descLower.contains("limpeza") || 
-                        descLower.contains("empregada") || descLower.contains("doméstica")) {
+                case "compras":
+                    if (containsAny(descLower, "amazon", "mercado livre", "magazine luiza", "americanas", "casas bahia", "extra", "carrefour", "walmart", 
+                            "compra online", "e-commerce", "ecommerce", "marketplace", "loja online")) {
                         return type.getId();
                     }
                     break;
-                case "viagem":
-                    if (descLower.contains("viagem") || descLower.contains("hotel") || descLower.contains("hospedagem") || 
-                        descLower.contains("airbnb") || descLower.contains("booking") || descLower.contains("passagem") || 
-                        descLower.contains("aéreo") || descLower.contains("avião")) {
+                case "financeiro":
+                    if (containsAny(descLower, "banco", "tarifa", "anuidade", "juros", "taxa", "emprestimo", "empréstimo", "financiamento", 
+                            "cartao", "cartão", "fatura", "boleto", "pix", "ted", "doc", "investimento", "corretora")) {
                         return type.getId();
                     }
                     break;
-                case "carro":
-                    if (descLower.contains("combustível") || descLower.contains("gasolina") || descLower.contains("posto") || 
-                        descLower.contains("ipva") || descLower.contains("seguro auto") || descLower.contains("oficina") || 
-                        descLower.contains("mecânico") || descLower.contains("estacionamento")) {
+                case "pets":
+                    if (containsAny(descLower, "pet", "pet shop", "veterinario", "veterinário", "veterinaria", "veterinária", "racao", "ração", 
+                            "animal", "cachorro", "gato", "petz", "cobasi")) {
+                        return type.getId();
+                    }
+                    break;
+                case "cuidados pessoais":
+                    if (containsAny(descLower, "perfumaria", "cosmeticos", "cosméticos", "maquiagem", "creme", "shampoo", "condicionador", 
+                            "sabonete", "desodorante", "barbeiro", "barbearia", "salao", "salão", "beleza", "estetica", "estética", 
+                            "spa", "massagem", "manicure", "pedicure", "depilacao", "depilação", "cabeleireiro", "corte de cabelo", 
+                            "tintura", "alisamento", "unhas", "esmalte")) {
+                        return type.getId();
+                    }
+                    break;
+                case "delivery":
+                    if (containsAny(descLower, "ifood", "rappi", "uber eats", "delivery", "entrega", "pedido online", "pedido delivery", 
+                            "app delivery", "i food", "rappi delivery", "uber eats delivery", "99 food", "pedidos ja", "pedidosja", 
+                            "aiquefome", "ai que fome")) {
                         return type.getId();
                     }
                     break;
@@ -414,6 +683,15 @@ public class ExtractService {
         
         // Se não encontrou nenhum match, retorna null (será mapeado para "Outros" depois)
         return null;
+    }
+    
+    private boolean containsAny(String text, String... keywords) {
+        for (String keyword : keywords) {
+            if (text.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
     }
     
     private boolean isValidTransaction(IdentifiedTransaction transaction) {

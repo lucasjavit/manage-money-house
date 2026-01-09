@@ -32,8 +32,8 @@ public class ExtractTransaction {
     private User user;
 
     @ManyToOne
-    @JoinColumn(name = "expense_type_id", nullable = false)
-    private ExpenseType expenseType;
+    @JoinColumn(name = "extract_expense_type_id", nullable = true)
+    private ExtractExpenseType extractExpenseType;
 
     @Column(nullable = false, length = 500)
     private String description;

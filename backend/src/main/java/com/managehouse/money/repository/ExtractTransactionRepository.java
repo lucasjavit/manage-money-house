@@ -21,7 +21,7 @@ public interface ExtractTransactionRepository extends JpaRepository<ExtractTrans
         @Param("endDate") java.time.LocalDate endDate
     );
 
-    @Query("SELECT COUNT(e) FROM ExtractTransaction e WHERE e.expenseType.id = :expenseTypeId")
+    @Query("SELECT COUNT(e) FROM ExtractTransaction e WHERE e.extractExpenseType.id = :expenseTypeId")
     long countByExpenseTypeId(@Param("expenseTypeId") Long expenseTypeId);
 }
 
