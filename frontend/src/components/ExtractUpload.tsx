@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { extractService, type ExtractUploadRequest } from '../services/extractService';
-import type { IdentifiedTransaction, ExtractTransaction } from '../types';
+import type { ExpenseInsightsResponse, ExpenseType, ExtractTransaction, IdentifiedTransaction } from '../types';
 
 const ExtractUpload = () => {
   const { user } = useAuth();
@@ -12,6 +12,11 @@ const ExtractUpload = () => {
   const [error, setError] = useState<string | null>(null);
   const [savedTransactions, setSavedTransactions] = useState<ExtractTransaction[]>([]);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
+  const [selectedTransactionIds, setSelectedTransactionIds] = useState<Set<number>>(new Set());
+  const [expenseTypes, setExpenseTypes] = useState<ExpenseType[]>([]);
+  const [selectedExpenseTypeId, setSelectedExpenseTypeId] = useState<number | ''>('');
+  const [insights, setInsights] = useState<ExpenseInsightsResponse | null>(null);
+  const [loadingInsights, setLoadingInsights] = useState(false);
   // Inicializar sempre com o mês e ano atual
   const getCurrentMonth = () => new Date().getMonth() + 1; // 1-12
   const getCurrentYear = () => new Date().getFullYear();
@@ -118,12 +123,52 @@ const ExtractUpload = () => {
     }
   }, []); // Executar apenas uma vez ao montar
 
+  // Carregar tipos de despesa do banco (tipos específicos para Cartão de Crédito)
+  useEffect(() => {
+    const loadExpenseTypes = async () => {
+      try {
+        console.log('Carregando tipos de despesa do Cartão de Crédito...');
+        const types = await extractService.getExtractExpenseTypes();
+        console.log('Tipos de despesa (Cartão de Crédito) carregados:', types);
+        console.log('Quantidade de tipos:', types.length);
+        if (types.length === 0) {
+          console.warn('Nenhum tipo de despesa encontrado! Verifique se o backend criou os tipos na tabela extract_expense_types.');
+        }
+        // Ordenar tipos alfabeticamente por nome, mas "Outros" sempre por último
+        const sortedTypes = [...types].sort((a, b) => {
+          if (a.name === 'Outros') return 1;
+          if (b.name === 'Outros') return -1;
+          return a.name.localeCompare(b.name, 'pt-BR');
+        });
+        setExpenseTypes(sortedTypes);
+      } catch (err) {
+        console.error('Erro ao carregar tipos de despesa:', err);
+        alert('Erro ao carregar tipos de despesa. Verifique o console para mais detalhes.');
+      }
+    };
+    loadExpenseTypes();
+  }, []);
+
   // Carregar transações quando user, mês ou ano mudarem
   useEffect(() => {
     if (user && selectedMonth && selectedYear) {
       loadSavedTransactions();
+      loadInsights();
     }
   }, [user, selectedMonth, selectedYear]);
+
+  const loadInsights = async () => {
+    if (!user) return;
+    setLoadingInsights(true);
+    try {
+      const data = await extractService.getInsights(user.id, selectedMonth, selectedYear);
+      setInsights(data);
+    } catch (err) {
+      console.error('Erro ao carregar insights:', err);
+    } finally {
+      setLoadingInsights(false);
+    }
+  };
 
   const loadSavedTransactions = async () => {
     if (!user) return;
@@ -209,10 +254,74 @@ const ExtractUpload = () => {
     
     try {
       await extractService.deleteTransaction(id);
+      setSelectedTransactionIds(new Set());
       await loadSavedTransactions();
     } catch (err) {
       console.error('Erro ao excluir transação:', err);
       alert('Erro ao excluir transação.');
+    }
+  };
+
+  const handleToggleSelect = (id: number) => {
+    const newSelected = new Set(selectedTransactionIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedTransactionIds(newSelected);
+  };
+
+
+  const handleDeleteSelected = async () => {
+    if (selectedTransactionIds.size === 0) {
+      alert('Selecione pelo menos uma transação para excluir.');
+      return;
+    }
+    
+    if (!confirm(`Deseja realmente excluir ${selectedTransactionIds.size} transação(ões)?`)) return;
+    
+    try {
+      await extractService.deleteTransactions(Array.from(selectedTransactionIds));
+      setSelectedTransactionIds(new Set());
+      await loadSavedTransactions();
+      alert(`${selectedTransactionIds.size} transação(ões) excluída(s) com sucesso!`);
+    } catch (err) {
+      console.error('Erro ao excluir transações:', err);
+      alert('Erro ao excluir transações.');
+    }
+  };
+
+  const handleUpdateSelectedType = async () => {
+    if (selectedTransactionIds.size === 0) {
+      alert('Selecione pelo menos uma transação para alterar o tipo.');
+      return;
+    }
+    
+    if (!selectedExpenseTypeId) {
+      alert('Selecione um tipo de despesa.');
+      return;
+    }
+    
+    try {
+      await extractService.updateTransactionsType(Array.from(selectedTransactionIds), selectedExpenseTypeId);
+      setSelectedTransactionIds(new Set());
+      setSelectedExpenseTypeId('');
+      await loadSavedTransactions();
+      alert(`${selectedTransactionIds.size} transação(ões) atualizada(s) com sucesso!`);
+    } catch (err) {
+      console.error('Erro ao atualizar tipo das transações:', err);
+      alert('Erro ao atualizar tipo das transações.');
+    }
+  };
+
+  const handleUpdateSingleTransactionType = async (transactionId: number, newExpenseTypeId: number) => {
+    try {
+      await extractService.updateTransactionType(transactionId, newExpenseTypeId);
+      await loadSavedTransactions();
+    } catch (err) {
+      console.error('Erro ao atualizar tipo da transação:', err);
+      alert('Erro ao atualizar tipo da transação.');
     }
   };
 
@@ -442,6 +551,282 @@ const ExtractUpload = () => {
         </div>
       </div>
 
+      {/* Seção de Insights - Melhorada */}
+      {savedTransactions.length > 0 && (
+        <div className="bg-gradient-to-br from-blue-50 via-white to-purple-50 rounded-2xl shadow-lg border-2 border-slate-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md">
+                <span className="text-2xl">📊</span>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-slate-800">Análise Financeira</h2>
+                <p className="text-xs text-slate-600">Insights do seu mês</p>
+              </div>
+            </div>
+            <button
+              onClick={loadInsights}
+              disabled={loadingInsights}
+              className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              <span>{loadingInsights ? 'Analisando...' : 'Atualizar'}</span>
+              {loadingInsights ? '⏳' : '🔄'}
+            </button>
+          </div>
+
+          {loadingInsights ? (
+            <div className="flex justify-center py-4">
+              <svg className="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </div>
+          ) : insights ? (
+            <>
+              {/* Quick Stats - Grid Inteligente */}
+              {insights.quickStats && insights.quickStats.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+                  {insights.quickStats.map((stat: any, idx: number) => (
+                    <div key={idx} className={`border rounded-lg p-2.5 ${
+                      stat.color === 'red' ? 'bg-red-50 border-red-200' :
+                      stat.color === 'blue' ? 'bg-blue-50 border-blue-200' :
+                      stat.color === 'purple' ? 'bg-purple-50 border-purple-200' :
+                      stat.color === 'green' ? 'bg-green-50 border-green-200' :
+                      'bg-slate-50 border-slate-200'
+                    }`}>
+                      <p className="text-xs font-medium mb-0.5 flex items-center gap-1">
+                        <span>{stat.icon}</span>
+                        <span className={stat.color === 'red' ? 'text-red-700' :
+                          stat.color === 'blue' ? 'text-blue-700' :
+                          stat.color === 'purple' ? 'text-purple-700' :
+                          stat.color === 'green' ? 'text-green-700' :
+                          'text-slate-700'}>
+                          {stat.label}
+                        </span>
+                      </p>
+                      <p className={`text-sm font-bold ${
+                        stat.color === 'red' ? 'text-red-600' :
+                        stat.color === 'blue' ? 'text-blue-600' :
+                        stat.color === 'purple' ? 'text-purple-600' :
+                        stat.color === 'green' ? 'text-green-600' :
+                        'text-slate-600'
+                      }`}>
+                        {stat.value}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Cards Principais - Melhorados */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                {/* Total Gasto */}
+                <div className="bg-gradient-to-br from-red-50 to-red-100 border-2 border-red-200 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-2xl">💰</span>
+                    <span className="text-xs font-semibold text-red-700 bg-red-200 px-2 py-1 rounded-full">Total</span>
+                  </div>
+                  <p className="text-2xl font-bold text-red-700 mb-1">
+                    {new Intl.NumberFormat('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                      maximumFractionDigits: 0,
+                    }).format(insights.totalSpent || 0)}
+                  </p>
+                  <p className="text-xs text-red-600">Gastos do mês</p>
+                </div>
+
+                {/* Transações */}
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-2xl">📊</span>
+                    <span className="text-xs font-semibold text-blue-700 bg-blue-200 px-2 py-1 rounded-full">Qtd</span>
+                  </div>
+                  <p className="text-2xl font-bold text-blue-700 mb-1">{insights.totalTransactions || 0}</p>
+                  <p className="text-xs text-blue-600">Transações</p>
+                </div>
+
+                {/* Média */}
+                {insights.averagePerTransaction && (
+                  <div className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-2xl">📈</span>
+                      <span className="text-xs font-semibold text-green-700 bg-green-200 px-2 py-1 rounded-full">Média</span>
+                    </div>
+                    <p className="text-2xl font-bold text-green-700 mb-1">
+                      {new Intl.NumberFormat('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                        maximumFractionDigits: 0,
+                      }).format(insights.averagePerTransaction)}
+                    </p>
+                    <p className="text-xs text-green-600">Por transação</p>
+                  </div>
+                )}
+
+                {/* Dia Mais Caro */}
+                {insights.mostExpensiveDay && (
+                  <div className="bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-200 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-2xl">📅</span>
+                      <span className="text-xs font-semibold text-orange-700 bg-orange-200 px-2 py-1 rounded-full">Top</span>
+                    </div>
+                    <p className="text-xl font-bold text-orange-700 mb-1 truncate">{insights.mostExpensiveDay}</p>
+                    <p className="text-xs text-orange-600">Dia mais caro</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Tendência */}
+              {insights.trends && insights.trends.length > 0 && (
+                <div className={`border rounded-lg p-2.5 mb-3 ${
+                  insights.trends[0].type === 'increase' ? 'bg-red-50 border-red-200' :
+                  insights.trends[0].type === 'decrease' ? 'bg-green-50 border-green-200' :
+                  'bg-slate-50 border-slate-200'
+                }`}>
+                  <p className="text-xs font-medium mb-1 flex items-center gap-1">
+                    <span>{insights.trends[0].type === 'increase' ? '📈' : 
+                     insights.trends[0].type === 'decrease' ? '📉' : '➡️'}</span>
+                    <span>vs Mês Anterior</span>
+                  </p>
+                  <p className={`text-sm font-bold ${
+                    insights.trends[0].type === 'increase' ? 'text-red-600' :
+                    insights.trends[0].type === 'decrease' ? 'text-green-600' :
+                    'text-slate-600'
+                  }`}>
+                    {insights.trends[0].value}
+                  </p>
+                </div>
+              )}
+            </>
+          ) : null}
+
+          {/* Top 3 Gastos - Melhorado */}
+          {insights?.topExpenses && insights.topExpenses.length > 0 && (
+            <div className="mt-6 bg-gradient-to-br from-red-50 to-orange-50 rounded-xl p-4 border-2 border-red-200 shadow-sm">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-xl">🔥</span>
+                <h3 className="text-base font-bold text-red-800">Maiores Gastos</h3>
+              </div>
+              <div className="space-y-3">
+                {insights.topExpenses.slice(0, 3).map((expense: any, idx: number) => {
+                  const medals = ['🥇', '🥈', '🥉'];
+                  return (
+                    <div key={idx} className="bg-white rounded-lg p-3 shadow-sm border border-red-100 hover:shadow-md transition-shadow">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{medals[idx]}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-slate-900 truncate">{expense.description}</p>
+                          <p className="text-xs text-slate-600">#{idx + 1} maior gasto</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-red-600">
+                            {new Intl.NumberFormat('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                              maximumFractionDigits: 0,
+                            }).format(expense.amount)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Categorias - Melhoradas */}
+          {insights?.categories && insights.categories.length > 0 && (
+            <div className="mt-6 bg-white rounded-xl p-4 border-2 border-slate-200 shadow-sm">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-xl">📁</span>
+                <h3 className="text-base font-bold text-slate-800">Gastos por Categoria</h3>
+              </div>
+              <div className="space-y-3">
+                {insights.categories.slice(0, 5).map((cat: any, idx: number) => {
+                  const colors = [
+                    'from-blue-500 to-blue-600',
+                    'from-purple-500 to-purple-600',
+                    'from-pink-500 to-pink-600',
+                    'from-orange-500 to-orange-600',
+                    'from-green-500 to-green-600'
+                  ];
+                  return (
+                    <div key={idx} className="bg-slate-50 rounded-lg p-3 hover:bg-slate-100 transition-colors">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-semibold text-slate-800">{cat.categoryName}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-slate-600">
+                            {new Intl.NumberFormat('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                              maximumFractionDigits: 0,
+                            }).format(cat.total)}
+                          </span>
+                          <span className="text-sm font-bold text-slate-900 bg-slate-200 px-2 py-0.5 rounded-full">
+                            {cat.percentage.toFixed(0)}%
+                          </span>
+                        </div>
+                      </div>
+                      <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+                        <div
+                          className={`bg-gradient-to-r ${colors[idx % colors.length]} h-2.5 rounded-full transition-all duration-500 shadow-sm`}
+                          style={{ width: `${Math.min(cat.percentage, 100)}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Sugestões e Alertas IA - Grid */}
+          <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Sugestões IA */}
+            {insights?.aiInsights?.suggestions && insights.aiInsights.suggestions.length > 0 && (
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 border-2 border-green-200 shadow-sm">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-xl">💡</span>
+                  <h3 className="text-base font-bold text-green-800">Dicas Inteligentes</h3>
+                </div>
+                <div className="space-y-2">
+                  {insights.aiInsights.suggestions.slice(0, 3).map((suggestion: string, idx: number) => (
+                    <div key={idx} className="bg-white/70 rounded-lg p-3 border border-green-100">
+                      <p className="text-sm text-slate-700 flex items-start gap-2">
+                        <span className="text-green-600 font-bold text-lg leading-none">✓</span>
+                        <span className="flex-1">{suggestion}</span>
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Alertas */}
+            {insights?.aiInsights?.warnings && insights.aiInsights.warnings.length > 0 && (
+              <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl p-4 border-2 border-yellow-300 shadow-sm">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-xl">⚠️</span>
+                  <h3 className="text-base font-bold text-orange-800">Pontos de Atenção</h3>
+                </div>
+                <div className="space-y-2">
+                  {insights.aiInsights.warnings.slice(0, 2).map((warning: string, idx: number) => (
+                    <div key={idx} className="bg-white/70 rounded-lg p-3 border border-orange-200">
+                      <p className="text-sm text-slate-700 flex items-start gap-2">
+                        <span className="text-orange-600 font-bold text-lg leading-none">!</span>
+                        <span className="flex-1">{warning}</span>
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Seção de Transações Salvas */}
       <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border-2 border-slate-200/60 p-6">
         <div className="flex items-center justify-between mb-6">
@@ -521,10 +906,66 @@ const ExtractUpload = () => {
           </div>
         ) : savedTransactions.length > 0 ? (
           <div className="space-y-6">
+            {/* Barra de ações para seleção múltipla */}
+            {selectedTransactionIds.size > 0 && (
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <span className="text-sm font-semibold text-blue-700">
+                    {selectedTransactionIds.size} transação(ões) selecionada(s)
+                  </span>
+                  {expenseTypes.length > 0 ? (
+                    <select
+                      value={selectedExpenseTypeId}
+                      onChange={(e) => setSelectedExpenseTypeId(Number(e.target.value))}
+                      className="px-3 py-2 text-sm font-medium text-slate-700 bg-white border-2 border-slate-300 rounded-lg hover:bg-slate-50 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Selecione um tipo</option>
+                      {expenseTypes.map((type) => (
+                        <option key={type.id} value={type.id}>
+                          {type.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="text-sm text-slate-500 px-3 py-2">Carregando tipos...</span>
+                  )}
+                  <button
+                    onClick={handleUpdateSelectedType}
+                    disabled={!selectedExpenseTypeId}
+                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border-2 border-blue-700 rounded-lg hover:bg-blue-700 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Alterar Tipo
+                  </button>
+                </div>
+                <button
+                  onClick={handleDeleteSelected}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 border-2 border-red-700 rounded-lg hover:bg-red-700 transition-all shadow-sm"
+                >
+                  Excluir Selecionadas
+                </button>
+              </div>
+            )}
+            
             <div className="text-sm text-slate-600 mb-4">
               Total de transações: {savedTransactions.length}
             </div>
-            {groupTransactionsByMonth(savedTransactions).map((group) => (
+            {groupTransactionsByMonth(savedTransactions).map((group) => {
+              const groupTransactionIds = group.transactions.map(t => t.id);
+              const allGroupSelected = groupTransactionIds.length > 0 && 
+                groupTransactionIds.every(id => selectedTransactionIds.has(id));
+              const someGroupSelected = groupTransactionIds.some(id => selectedTransactionIds.has(id));
+              
+              const handleSelectAllInGroup = () => {
+                const newSelected = new Set(selectedTransactionIds);
+                if (allGroupSelected) {
+                  groupTransactionIds.forEach(id => newSelected.delete(id));
+                } else {
+                  groupTransactionIds.forEach(id => newSelected.add(id));
+                }
+                setSelectedTransactionIds(newSelected);
+              };
+              
+              return (
               <div key={group.monthYear} className="border-2 border-slate-200 rounded-xl overflow-hidden">
                 {/* Cabeçalho do Mês */}
                 <div className="bg-gradient-to-r from-blue-50 to-blue-100 border-b-2 border-blue-200 px-6 py-4">
@@ -551,36 +992,88 @@ const ExtractUpload = () => {
 
                 {/* Tabela de Transações do Mês */}
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-slate-200">
+                  <table className="min-w-full divide-y divide-slate-100 border-separate border-spacing-0">
                     <thead className="bg-slate-50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase">Data</th>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase">Descrição</th>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase">Tipo</th>
-                        <th className="px-4 py-3 text-right text-xs font-bold text-slate-700 uppercase">Valor</th>
-                        <th className="px-4 py-3 text-center text-xs font-bold text-slate-700 uppercase">Ações</th>
+                        <th className="px-3 py-2 text-center text-xs font-bold text-slate-700 uppercase w-16">#</th>
+                        <th className="px-3 py-2 text-left text-xs font-bold text-slate-700 uppercase">
+                          <input
+                            type="checkbox"
+                            checked={allGroupSelected}
+                            ref={(input) => {
+                              if (input) input.indeterminate = someGroupSelected && !allGroupSelected;
+                            }}
+                            onChange={handleSelectAllInGroup}
+                            className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                          />
+                        </th>
+                        <th className="px-3 py-2 text-left text-xs font-bold text-slate-700 uppercase">Data</th>
+                        <th className="px-3 py-2 text-left text-xs font-bold text-slate-700 uppercase">Descrição</th>
+                        <th className="px-3 py-2 text-left text-xs font-bold text-slate-700 uppercase">Tipo</th>
+                        <th className="px-3 py-2 text-right text-xs font-bold text-slate-700 uppercase">Valor</th>
+                        <th className="px-3 py-2 text-center text-xs font-bold text-slate-700 uppercase">Ações</th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-slate-200">
-                      {group.transactions.map((transaction) => (
-                        <tr key={transaction.id} className="hover:bg-slate-50">
-                          <td className="px-4 py-3 text-sm text-slate-600">
+                    <tbody className="bg-white divide-y divide-slate-100">
+                      {group.transactions.map((transaction, index) => (
+                        <tr 
+                          key={transaction.id} 
+                          className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50'} hover:bg-slate-100 ${selectedTransactionIds.has(transaction.id) ? 'bg-blue-50 hover:bg-blue-100' : ''}`}
+                        >
+                          <td className="px-3 py-2 text-sm font-semibold text-slate-500 text-center">
+                            {index + 1}
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="checkbox"
+                              checked={selectedTransactionIds.has(transaction.id)}
+                              onChange={() => handleToggleSelect(transaction.id)}
+                              className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                            />
+                          </td>
+                          <td className="px-3 py-2 text-sm text-slate-600">
                             {new Date(transaction.transactionDate).toLocaleDateString('pt-BR')}
                           </td>
-                          <td className="px-4 py-3 text-sm text-slate-900">{transaction.description}</td>
-                          <td className="px-4 py-3 text-sm text-slate-700">{transaction.expenseTypeName}</td>
-                          <td className="px-4 py-3 text-sm font-semibold text-slate-900 text-right">
+                          <td className="px-3 py-2 text-sm text-slate-900">{transaction.description}</td>
+                          <td className="px-3 py-2">
+                            <select
+                              value={transaction.expenseTypeId}
+                              onChange={(e) => handleUpdateSingleTransactionType(transaction.id, Number(e.target.value))}
+                              className="px-2 py-1 text-sm font-medium text-slate-700 bg-white border-2 border-slate-300 rounded-lg hover:bg-slate-50 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[140px]"
+                            >
+                              {expenseTypes.map((type) => (
+                                <option key={type.id} value={type.id}>
+                                  {type.name}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-3 py-2 text-sm font-semibold text-slate-900 text-right">
                             {new Intl.NumberFormat('pt-BR', {
                               style: 'currency',
                               currency: 'BRL',
                             }).format(transaction.amount)}
                           </td>
-                          <td className="px-4 py-3 text-center">
+                          <td className="px-3 py-2 text-center">
                             <button
                               onClick={() => handleDeleteTransaction(transaction.id)}
-                              className="text-red-600 hover:text-red-800 font-semibold px-2 py-1 hover:bg-red-50 rounded transition-colors"
+                              className="text-red-600 hover:text-red-800 p-2 hover:bg-red-50 rounded transition-colors"
+                              title="Excluir transação"
                             >
-                              Excluir
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-5 w-5"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                />
+                              </svg>
                             </button>
                           </td>
                         </tr>
@@ -589,7 +1082,8 @@ const ExtractUpload = () => {
                   </table>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="text-center py-8">
