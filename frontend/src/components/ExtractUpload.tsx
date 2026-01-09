@@ -679,23 +679,25 @@ const ExtractUpload = () => {
 
               {/* Tendência */}
               {insights.trends && insights.trends.length > 0 && (
-                <div className={`border rounded-lg p-2.5 mb-3 ${
+                <div className={`border-2 rounded-xl p-3 mb-6 shadow-sm ${
                   insights.trends[0].type === 'increase' ? 'bg-red-50 border-red-200' :
                   insights.trends[0].type === 'decrease' ? 'bg-green-50 border-green-200' :
                   'bg-slate-50 border-slate-200'
                 }`}>
-                  <p className="text-xs font-medium mb-1 flex items-center gap-1">
-                    <span>{insights.trends[0].type === 'increase' ? '📈' : 
-                     insights.trends[0].type === 'decrease' ? '📉' : '➡️'}</span>
-                    <span>vs Mês Anterior</span>
-                  </p>
-                  <p className={`text-sm font-bold ${
-                    insights.trends[0].type === 'increase' ? 'text-red-600' :
-                    insights.trends[0].type === 'decrease' ? 'text-green-600' :
-                    'text-slate-600'
-                  }`}>
-                    {insights.trends[0].value}
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">{insights.trends[0].type === 'increase' ? '📈' :
+                       insights.trends[0].type === 'decrease' ? '📉' : '➡️'}</span>
+                      <span className="text-sm font-semibold text-slate-700">vs Mês Anterior</span>
+                    </div>
+                    <p className={`text-lg font-bold ${
+                      insights.trends[0].type === 'increase' ? 'text-red-600' :
+                      insights.trends[0].type === 'decrease' ? 'text-green-600' :
+                      'text-slate-600'
+                    }`}>
+                      {insights.trends[0].value}
+                    </p>
+                  </div>
                 </div>
               )}
             </>
