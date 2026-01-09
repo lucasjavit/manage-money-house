@@ -583,42 +583,7 @@ const ExtractUpload = () => {
             </div>
           ) : insights ? (
             <>
-              {/* Quick Stats - Grid Inteligente */}
-              {insights.quickStats && insights.quickStats.length > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
-                  {insights.quickStats.map((stat: any, idx: number) => (
-                    <div key={idx} className={`border rounded-lg p-2.5 ${
-                      stat.color === 'red' ? 'bg-red-50 border-red-200' :
-                      stat.color === 'blue' ? 'bg-blue-50 border-blue-200' :
-                      stat.color === 'purple' ? 'bg-purple-50 border-purple-200' :
-                      stat.color === 'green' ? 'bg-green-50 border-green-200' :
-                      'bg-slate-50 border-slate-200'
-                    }`}>
-                      <p className="text-xs font-medium mb-0.5 flex items-center gap-1">
-                        <span>{stat.icon}</span>
-                        <span className={stat.color === 'red' ? 'text-red-700' :
-                          stat.color === 'blue' ? 'text-blue-700' :
-                          stat.color === 'purple' ? 'text-purple-700' :
-                          stat.color === 'green' ? 'text-green-700' :
-                          'text-slate-700'}>
-                          {stat.label}
-                        </span>
-                      </p>
-                      <p className={`text-sm font-bold ${
-                        stat.color === 'red' ? 'text-red-600' :
-                        stat.color === 'blue' ? 'text-blue-600' :
-                        stat.color === 'purple' ? 'text-purple-600' :
-                        stat.color === 'green' ? 'text-green-600' :
-                        'text-slate-600'
-                      }`}>
-                        {stat.value}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Cards Principais - Melhorados */}
+              {/* Cards Principais - Melhorados com Quick Stats */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 {/* Total Gasto */}
                 <div className="bg-gradient-to-br from-red-50 to-red-100 border-2 border-red-200 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
@@ -664,42 +629,98 @@ const ExtractUpload = () => {
                   </div>
                 )}
 
-                {/* Dia Mais Caro */}
-                {insights.mostExpensiveDay && (
-                  <div className="bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-200 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-2xl">📅</span>
-                      <span className="text-xs font-semibold text-orange-700 bg-orange-200 px-2 py-1 rounded-full">Top</span>
+                  {/* Dia Mais Caro */}
+                  {insights.mostExpensiveDay && (
+                    <div className="bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-200 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-2xl">📅</span>
+                        <span className="text-xs font-semibold text-orange-700 bg-orange-200 px-2 py-1 rounded-full">Top</span>
+                      </div>
+                      <p className="text-xl font-bold text-orange-700 mb-1 truncate">{insights.mostExpensiveDay}</p>
+                      <p className="text-xs text-orange-600">Dia mais caro</p>
                     </div>
-                    <p className="text-xl font-bold text-orange-700 mb-1 truncate">{insights.mostExpensiveDay}</p>
-                    <p className="text-xs text-orange-600">Dia mais caro</p>
-                  </div>
-                )}
-              </div>
+                  )}
 
-              {/* Tendência */}
-              {insights.trends && insights.trends.length > 0 && (
-                <div className={`border-2 rounded-xl p-3 mb-6 shadow-sm ${
-                  insights.trends[0].type === 'increase' ? 'bg-red-50 border-red-200' :
-                  insights.trends[0].type === 'decrease' ? 'bg-green-50 border-green-200' :
-                  'bg-slate-50 border-slate-200'
-                }`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">{insights.trends[0].type === 'increase' ? '📈' :
-                       insights.trends[0].type === 'decrease' ? '📉' : '➡️'}</span>
-                      <span className="text-sm font-semibold text-slate-700">vs Mês Anterior</span>
-                    </div>
-                    <p className={`text-lg font-bold ${
-                      insights.trends[0].type === 'increase' ? 'text-red-600' :
-                      insights.trends[0].type === 'decrease' ? 'text-green-600' :
-                      'text-slate-600'
+                  {/* Tendência vs Mês Anterior */}
+                  {insights.trends && insights.trends.length > 0 && (
+                    <div className={`bg-gradient-to-br border-2 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow ${
+                      insights.trends[0].type === 'increase' ? 'from-red-50 to-red-100 border-red-200' :
+                      insights.trends[0].type === 'decrease' ? 'from-green-50 to-green-100 border-green-200' :
+                      'from-slate-50 to-slate-100 border-slate-200'
                     }`}>
-                      {insights.trends[0].value}
-                    </p>
-                  </div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-2xl">{insights.trends[0].type === 'increase' ? '📈' :
+                         insights.trends[0].type === 'decrease' ? '📉' : '➡️'}</span>
+                        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                          insights.trends[0].type === 'increase' ? 'text-red-700 bg-red-200' :
+                          insights.trends[0].type === 'decrease' ? 'text-green-700 bg-green-200' :
+                          'text-slate-700 bg-slate-200'
+                        }`}>
+                          vs Anterior
+                        </span>
+                      </div>
+                      <p className={`text-2xl font-bold mb-1 ${
+                        insights.trends[0].type === 'increase' ? 'text-red-700' :
+                        insights.trends[0].type === 'decrease' ? 'text-green-700' :
+                        'text-slate-700'
+                      }`}>
+                        {insights.trends[0].value}
+                      </p>
+                      <p className={`text-xs ${
+                        insights.trends[0].type === 'increase' ? 'text-red-600' :
+                        insights.trends[0].type === 'decrease' ? 'text-green-600' :
+                        'text-slate-600'
+                      }`}>
+                        Comparação mensal
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Quick Stats integrados */}
+                  {insights.quickStats && insights.quickStats.map((stat: any, idx: number) => (
+                    <div key={idx} className={`bg-gradient-to-br border-2 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow ${
+                      stat.color === 'red' ? 'from-red-50 to-red-100 border-red-200' :
+                      stat.color === 'blue' ? 'from-blue-50 to-blue-100 border-blue-200' :
+                      stat.color === 'purple' ? 'from-purple-50 to-purple-100 border-purple-200' :
+                      stat.color === 'green' ? 'from-green-50 to-green-100 border-green-200' :
+                      'from-slate-50 to-slate-100 border-slate-200'
+                    }`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-2xl">{stat.icon}</span>
+                        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                          stat.color === 'red' ? 'text-red-700 bg-red-200' :
+                          stat.color === 'blue' ? 'text-blue-700 bg-blue-200' :
+                          stat.color === 'purple' ? 'text-purple-700 bg-purple-200' :
+                          stat.color === 'green' ? 'text-green-700 bg-green-200' :
+                          'text-slate-700 bg-slate-200'
+                        }`}>
+                          {stat.label}
+                        </span>
+                      </div>
+                      <p className={`text-2xl font-bold mb-1 ${
+                        stat.color === 'red' ? 'text-red-700' :
+                        stat.color === 'blue' ? 'text-blue-700' :
+                        stat.color === 'purple' ? 'text-purple-700' :
+                        stat.color === 'green' ? 'text-green-700' :
+                        'text-slate-700'
+                      }`}>
+                        {stat.value}
+                      </p>
+                      <p className={`text-xs ${
+                        stat.color === 'red' ? 'text-red-600' :
+                        stat.color === 'blue' ? 'text-blue-600' :
+                        stat.color === 'purple' ? 'text-purple-600' :
+                        stat.color === 'green' ? 'text-green-600' :
+                        'text-slate-600'
+                      }`}>
+                        {stat.label.includes('Média') ? 'Por transação' :
+                         stat.label.includes('Maior') ? 'Gasto único' :
+                         stat.label.includes('Top') ? 'Categoria' :
+                         stat.label.includes('Transações') ? 'Por dia' : ''}
+                      </p>
+                    </div>
+                  ))}
                 </div>
-              )}
             </>
           ) : null}
 
