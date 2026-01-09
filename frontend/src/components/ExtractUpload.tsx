@@ -724,101 +724,104 @@ const ExtractUpload = () => {
             </>
           ) : null}
 
-          {/* Top 3 Gastos - Melhorado */}
-          {insights?.topExpenses && insights.topExpenses.length > 0 && (
-            <div className="mt-6 bg-gradient-to-br from-red-50 to-orange-50 rounded-xl p-4 border-2 border-red-200 shadow-sm">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="text-xl">🔥</span>
-                <h3 className="text-base font-bold text-red-800">Maiores Gastos</h3>
-              </div>
-              <div className="space-y-3">
-                {insights.topExpenses.slice(0, 3).map((expense: any, idx: number) => {
-                  const medals = ['🥇', '🥈', '🥉'];
-                  return (
-                    <div key={idx} className="bg-white rounded-lg p-3 shadow-sm border border-red-100 hover:shadow-md transition-shadow">
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl">{medals[idx]}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-slate-900 truncate">{expense.description}</p>
-                          <p className="text-xs text-slate-600">#{idx + 1} maior gasto</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-lg font-bold text-red-600">
-                            {new Intl.NumberFormat('pt-BR', {
-                              style: 'currency',
-                              currency: 'BRL',
-                              maximumFractionDigits: 0,
-                            }).format(expense.amount)}
-                          </p>
+          {/* Top 3 Gastos e Categorias - Lado a Lado */}
+          <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Top 3 Gastos - Melhorado */}
+            {insights?.topExpenses && insights.topExpenses.length > 0 && (
+              <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-xl p-4 border-2 border-red-200 shadow-sm">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-xl">🔥</span>
+                  <h3 className="text-base font-bold text-red-800">Maiores Gastos</h3>
+                </div>
+                <div className="space-y-3">
+                  {insights.topExpenses.slice(0, 3).map((expense: any, idx: number) => {
+                    const medals = ['🥇', '🥈', '🥉'];
+                    return (
+                      <div key={idx} className="bg-white rounded-lg p-3 shadow-sm border border-red-100 hover:shadow-md transition-shadow">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">{medals[idx]}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-slate-900 truncate">{expense.description}</p>
+                            <p className="text-xs text-slate-600">#{idx + 1} maior gasto</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-red-600">
+                              {new Intl.NumberFormat('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL',
+                                maximumFractionDigits: 0,
+                              }).format(expense.amount)}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Categorias - Melhoradas */}
-          {insights?.categories && insights.categories.length > 0 && (
-            <div className="mt-6 bg-white rounded-xl p-4 border-2 border-slate-200 shadow-sm">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="text-xl">📁</span>
-                <h3 className="text-base font-bold text-slate-800">Gastos por Categoria</h3>
-              </div>
-              <div className="space-y-3">
-                {insights.categories.slice(0, 5).map((cat: any, idx: number) => {
-                  const colors = [
-                    'from-blue-500 to-blue-600',
-                    'from-purple-500 to-purple-600',
-                    'from-pink-500 to-pink-600',
-                    'from-orange-500 to-orange-600',
-                    'from-green-500 to-green-600'
-                  ];
-                  return (
-                    <div key={idx} className="bg-slate-50 rounded-lg p-3 hover:bg-slate-100 transition-colors">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-semibold text-slate-800">{cat.categoryName}</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium text-slate-600">
-                            {new Intl.NumberFormat('pt-BR', {
-                              style: 'currency',
-                              currency: 'BRL',
-                              maximumFractionDigits: 0,
-                            }).format(cat.total)}
-                          </span>
-                          <span className="text-sm font-bold text-slate-900 bg-slate-200 px-2 py-0.5 rounded-full">
-                            {cat.percentage.toFixed(0)}%
-                          </span>
+            {/* Categorias - Melhoradas */}
+            {insights?.categories && insights.categories.length > 0 && (
+              <div className="bg-white rounded-xl p-4 border-2 border-slate-200 shadow-sm">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-xl">📁</span>
+                  <h3 className="text-base font-bold text-slate-800">Gastos por Categoria</h3>
+                </div>
+                <div className="space-y-3">
+                  {insights.categories.slice(0, 5).map((cat: any, idx: number) => {
+                    const colors = [
+                      'from-blue-500 to-blue-600',
+                      'from-purple-500 to-purple-600',
+                      'from-pink-500 to-pink-600',
+                      'from-orange-500 to-orange-600',
+                      'from-green-500 to-green-600'
+                    ];
+                    return (
+                      <div key={idx} className="bg-slate-50 rounded-lg p-3 hover:bg-slate-100 transition-colors">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-sm font-semibold text-slate-800">{cat.categoryName}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium text-slate-600">
+                              {new Intl.NumberFormat('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL',
+                                maximumFractionDigits: 0,
+                              }).format(cat.total)}
+                            </span>
+                            <span className="text-sm font-bold text-slate-900 bg-slate-200 px-2 py-0.5 rounded-full">
+                              {cat.percentage.toFixed(0)}%
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                      <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden mb-2">
-                        <div
-                          className={`bg-gradient-to-r ${colors[idx % colors.length]} h-2.5 rounded-full transition-all duration-500 shadow-sm`}
-                          style={{ width: `${Math.min(cat.percentage, 100)}%` }}
-                        ></div>
-                      </div>
-                      {cat.highestExpense && (
-                        <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-200">
-                          <span className="text-slate-600 flex items-center gap-1">
-                            <span className="text-sm">⬆️</span>
-                            Maior gasto:
-                          </span>
-                          <span className="font-bold text-slate-700">
-                            {new Intl.NumberFormat('pt-BR', {
-                              style: 'currency',
-                              currency: 'BRL',
-                              maximumFractionDigits: 0,
-                            }).format(cat.highestExpense)}
-                          </span>
+                        <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden mb-2">
+                          <div
+                            className={`bg-gradient-to-r ${colors[idx % colors.length]} h-2.5 rounded-full transition-all duration-500 shadow-sm`}
+                            style={{ width: `${Math.min(cat.percentage, 100)}%` }}
+                          ></div>
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+                        {cat.highestExpense && (
+                          <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-200">
+                            <span className="text-slate-600 flex items-center gap-1">
+                              <span className="text-sm">⬆️</span>
+                              Maior gasto:
+                            </span>
+                            <span className="font-bold text-slate-700">
+                              {new Intl.NumberFormat('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL',
+                                maximumFractionDigits: 0,
+                              }).format(cat.highestExpense)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Alertas IA */}
           {insights?.aiInsights?.warnings && insights.aiInsights.warnings.length > 0 && (
