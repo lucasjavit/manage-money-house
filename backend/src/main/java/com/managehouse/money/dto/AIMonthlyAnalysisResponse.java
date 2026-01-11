@@ -17,6 +17,9 @@ public class AIMonthlyAnalysisResponse {
     private List<String> recommendations;
     private Prediction nextMonthPrediction;
     private Comparison comparison;
+    private EconomicContextResponse economicContext; // Novo: contexto econômico
+    private List<MonthlySpendingData> historicalData; // Novo: dados históricos para gráficos (6 meses)
+    private HouseholdIncomeAnalysis householdIncome; // Novo: análise de renda da casa (Mariana + Lucas)
 
     @Data
     @NoArgsConstructor

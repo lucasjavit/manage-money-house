@@ -307,6 +307,9 @@ export interface AIMonthlyAnalysis {
   recommendations: string[];
   nextMonthPrediction: Prediction;
   comparison: Comparison;
+  economicContext?: EconomicContext; // Novo: contexto econômico
+  historicalData?: MonthlySpending[]; // Novo: dados históricos para gráficos (6 meses)
+  householdIncome?: HouseholdIncomeAnalysis; // Novo: análise de renda da casa (Mariana + Lucas)
 }
 
 export interface Pattern {
@@ -327,4 +330,68 @@ export interface Comparison {
   vsLastMonth: string;
   vsAverage: string;
   trend: 'increasing' | 'decreasing' | 'stable';
+}
+
+// Economic Context Types (IPCA, SELIC, USD/BRL, IGP-M)
+export interface EconomicContext {
+  ipca?: IndicatorData;
+  igpm?: IndicatorData;
+  selic?: SelicData;
+  usdBrl?: ExchangeData;
+  inflation12Months?: number;
+}
+
+export interface IndicatorData {
+  value: number;           // Valor do indicador (%)
+  period: string;          // Período (formato: "2026-01")
+  vsLastMonth: number;     // Variação vs mês anterior
+}
+
+export interface SelicData {
+  value: number;           // Taxa SELIC (%)
+  lastUpdate: string;      // Data da última atualização
+}
+
+export interface ExchangeData {
+  value: number;           // Cotação (R$)
+  variation: number;       // Variação percentual (%)
+}
+
+// Monthly Spending Data for Charts
+export interface MonthlySpending {
+  month: string;                    // Formato: "2025-08"
+  total: number;                    // Total gasto no mês
+  transactionCount: number;         // Quantidade de transações
+  categories: CategoryAmount[];     // Gastos por categoria
+}
+
+export interface CategoryAmount {
+  name: string;         // Nome da categoria
+  amount: number;       // Valor gasto na categoria
+}
+
+// Household Income Analysis Types (Mariana + Lucas)
+export interface HouseholdIncomeAnalysis {
+  marianaIncome: number;
+  lucasGrossIncome: number;
+  lucasNetIncome: number;
+  totalHouseholdIncome: number;
+  totalExpenses: number;
+  savings: number;
+  savingsRate: number;
+  expenseToIncomeRatio: number;
+  incomeStabilityScore: number;
+  incomeStabilityStatus: string;
+  historicalData: MonthlyIncomeData[];
+  budgetStatus: string;
+  recommendations: string[];
+}
+
+export interface MonthlyIncomeData {
+  month: string;            // Formato: "2025-08"
+  marianaIncome: number;    // Renda fixa Mariana
+  lucasIncome: number;      // Renda variável Lucas
+  totalIncome: number;      // Renda total da casa
+  expenses: number;         // Gastos totais
+  savings: number;          // Poupança (income - expenses)
 }

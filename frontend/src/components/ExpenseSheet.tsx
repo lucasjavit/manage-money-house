@@ -5,6 +5,12 @@ import { recurringExpenseService } from '../services/recurringExpenseService';
 import { aiService } from '../services/aiService';
 import type { Expense, ExpenseRequest, ExpenseType, ExpenseAlertsResponse, AIMonthlyAnalysis } from '../types';
 import RecurringExpenseButton from './RecurringExpenseButton';
+import HealthScoreGauge from './charts/HealthScoreGauge';
+import SpendingTrendChart from './charts/SpendingTrendChart';
+import InflationComparisonChart from './charts/InflationComparisonChart';
+import SavingsRateGauge from './charts/SavingsRateGauge';
+import IncomeVsExpensesChart from './charts/IncomeVsExpensesChart';
+import IncomeStabilityChart from './charts/IncomeStabilityChart';
 
 const ExpenseSheet = () => {
   const { user } = useAuth();
@@ -1049,7 +1055,7 @@ const ExpenseSheet = () => {
           {/* Modal */}
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div
-              className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+              className="bg-white rounded-2xl shadow-2xl max-w-7xl w-full max-h-[95vh] overflow-hidden flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
@@ -1075,33 +1081,285 @@ const ExpenseSheet = () => {
 
               {/* Content */}
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                {/* Score de Saúde */}
-                <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-4 border border-purple-200">
-                  <p className="text-sm font-semibold text-purple-800 mb-2">Saúde Financeira</p>
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1">
-                      <div className="w-full bg-purple-200 rounded-full h-3">
-                        <div
-                          className={`h-3 rounded-full ${
-                            aiAnalysis.financialHealthScore >= 70 ? 'bg-green-500' :
-                            aiAnalysis.financialHealthScore >= 40 ? 'bg-yellow-500' :
-                            'bg-red-500'
-                          }`}
-                          style={{ width: `${aiAnalysis.financialHealthScore}%` }}
-                        />
+                {/* ⚡ DECISÃO RÁPIDA - Quick Stats Section */}
+                <div className="bg-gradient-to-br from-purple-100 via-indigo-100 to-blue-100 rounded-xl p-5 border-2 border-purple-300 shadow-lg">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="text-2xl">⚡</span>
+                    <h3 className="text-lg font-bold text-purple-900">Decisão Rápida</h3>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    <div
+                      className="flex items-center gap-2 cursor-help relative group"
+                      title="Score de 0-100 que avalia sua situação financeira considerando gastos, padrões e tendências. 70+: Boa | 40-69: Atenção | 0-39: Crítica"
+                    >
+                      <span className={`text-xl ${
+                        aiAnalysis.financialHealthScore >= 70 ? '✅' :
+                        aiAnalysis.financialHealthScore >= 40 ? '⚠️' : '❌'
+                      }`}></span>
+                      <span className="font-semibold text-gray-700">Saúde Financeira:</span>
+                      <span className={`font-bold ${
+                        aiAnalysis.financialHealthScore >= 70 ? 'text-green-700' :
+                        aiAnalysis.financialHealthScore >= 40 ? 'text-yellow-700' : 'text-red-700'
+                      }`}>
+                        {aiAnalysis.financialHealthScore >= 70 ? 'BOA' :
+                         aiAnalysis.financialHealthScore >= 40 ? 'ATENÇÃO' : 'CRÍTICA'} ({aiAnalysis.financialHealthScore}/100)
+                      </span>
+                      <div className="absolute top-full left-0 mt-2 hidden group-hover:block w-72 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-xl z-50 pointer-events-none">
+                        <div className="absolute bottom-full left-4 w-0 h-0 border-l-8 border-r-8 border-b-8 border-transparent border-b-gray-900"></div>
+                        <div className="space-y-2">
+                          <div>
+                            <strong className="text-green-300">Saúde Financeira:</strong> Score de 0-100 que avalia sua situação financeira considerando gastos, padrões e tendências.
+                          </div>
+                          <div className="pl-2 space-y-1 text-gray-300">
+                            <div>• <span className="text-green-400">70-100:</span> Boa gestão financeira</div>
+                            <div>• <span className="text-yellow-400">40-69:</span> Requer atenção</div>
+                            <div>• <span className="text-red-400">0-39:</span> Situação crítica</div>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <span className="text-2xl font-bold text-purple-700">
-                      {aiAnalysis.financialHealthScore}/100
-                    </span>
+
+                    {aiAnalysis.economicContext?.ipca && (
+                      <div className="flex items-center gap-2 cursor-help relative group">
+                        <span className="text-xl">💰</span>
+                        <span
+                          className="font-semibold text-gray-700"
+                          title="Índice de Preços ao Consumidor Amplo - Mede a inflação oficial do Brasil calculada pelo IBGE"
+                        >
+                          IPCA:
+                        </span>
+                        <span className="font-bold text-red-600">{aiAnalysis.economicContext.ipca.value.toFixed(2)}%</span>
+                        {aiAnalysis.economicContext.igpm && (
+                          <>
+                            <span className="text-gray-500">|</span>
+                            <span
+                              className="font-semibold text-gray-700"
+                              title="Índice Geral de Preços do Mercado - Inflação que mede variação de preços no atacado, construção civil e consumidor"
+                            >
+                              IGP-M:
+                            </span>
+                            <span className="font-bold text-orange-600">{aiAnalysis.economicContext.igpm.value.toFixed(2)}%</span>
+                          </>
+                        )}
+                        <div className="absolute top-full left-0 mt-2 hidden group-hover:block w-80 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-xl z-50 pointer-events-none">
+                          <div className="absolute bottom-full left-4 w-0 h-0 border-l-8 border-r-8 border-b-8 border-transparent border-b-gray-900"></div>
+                          <div className="space-y-2">
+                            <div>
+                              <strong className="text-yellow-300">IPCA:</strong> Inflação oficial do Brasil medida pelo IBGE. Mede o custo de vida de famílias com renda de 1 a 40 salários mínimos.
+                            </div>
+                            <div>
+                              <strong className="text-orange-300">IGP-M:</strong> Índice da FGV que mede inflação do atacado (60%), consumidor (30%) e construção civil (10%). Usado em contratos de aluguel.
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {aiAnalysis.nextMonthPrediction && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">🎯</span>
+                        <span className="font-semibold text-gray-700">Predição Próx:</span>
+                        <span className="font-bold text-blue-700">
+                          {formatCurrency(aiAnalysis.nextMonthPrediction.predictedAmount)}
+                          <span className="text-xs ml-1">({(aiAnalysis.nextMonthPrediction.confidence * 100).toFixed(0)}%)</span>
+                        </span>
+                      </div>
+                    )}
+
+                    {aiAnalysis.economicContext?.usdBrl && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">💵</span>
+                        <span className="font-semibold text-gray-700">Dólar:</span>
+                        <span className="font-bold text-gray-700">
+                          R$ {aiAnalysis.economicContext.usdBrl.value.toFixed(2)}
+                          <span className={`text-xs ml-1 ${aiAnalysis.economicContext.usdBrl.variation >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                            ({aiAnalysis.economicContext.usdBrl.variation >= 0 ? '+' : ''}{aiAnalysis.economicContext.usdBrl.variation.toFixed(2)}%)
+                          </span>
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {/* Resumo Executivo */}
-                <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-                  <p className="text-sm font-semibold text-slate-700 mb-2">📋 Resumo Executivo</p>
-                  <p className="text-slate-700">{aiAnalysis.executiveSummary}</p>
+                {/* 🎯 VISÃO GERAL - Health Score Gauge */}
+                <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="text-2xl">🎯</span>
+                    <h3 className="text-lg font-bold text-slate-800">Visão Geral</h3>
+                  </div>
+                  <HealthScoreGauge score={aiAnalysis.financialHealthScore} />
+                  <div className="mt-4 p-3 bg-slate-50 rounded-lg">
+                    <p className="text-sm text-slate-700">{aiAnalysis.executiveSummary}</p>
+                  </div>
                 </div>
+
+                {/* 💰 ANÁLISE DE RENDA DA CASA */}
+                {aiAnalysis.householdIncome && (
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-5 border border-green-200 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="text-2xl">💰</span>
+                      <h3 className="text-lg font-bold text-green-900">Análise de Renda da Casa</h3>
+                    </div>
+
+                    {/* Quick Summary Cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+                      {/* Renda Total */}
+                      <div className="bg-white rounded-lg p-3 text-center border border-green-200">
+                        <div className="text-2xl mb-1">💵</div>
+                        <div className="text-xs font-semibold text-gray-600 mb-1">Renda Total</div>
+                        <div className="text-lg font-bold text-green-600">
+                          {formatCurrency(aiAnalysis.householdIncome.totalHouseholdIncome)}
+                        </div>
+                      </div>
+
+                      {/* Gastos Totais */}
+                      <div className="bg-white rounded-lg p-3 text-center border border-red-200">
+                        <div className="text-2xl mb-1">📊</div>
+                        <div className="text-xs font-semibold text-gray-600 mb-1">Gastos Totais</div>
+                        <div className="text-lg font-bold text-red-600">
+                          {formatCurrency(aiAnalysis.householdIncome.totalExpenses)}
+                        </div>
+                      </div>
+
+                      {/* Poupança */}
+                      <div className="bg-white rounded-lg p-3 text-center border border-blue-200">
+                        <div className="text-2xl mb-1">
+                          {aiAnalysis.householdIncome.savings >= 0 ? '💰' : '⚠️'}
+                        </div>
+                        <div className="text-xs font-semibold text-gray-600 mb-1">Poupança</div>
+                        <div className={`text-lg font-bold ${
+                          aiAnalysis.householdIncome.savings >= 0 ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {formatCurrency(aiAnalysis.householdIncome.savings)}
+                        </div>
+                      </div>
+
+                      {/* Taxa de Poupança */}
+                      <div className="bg-white rounded-lg p-3 text-center border border-purple-200">
+                        <div className="text-2xl mb-1">📈</div>
+                        <div className="text-xs font-semibold text-gray-600 mb-1">Taxa Poupança</div>
+                        <div className={`text-lg font-bold ${
+                          aiAnalysis.householdIncome.savingsRate >= 20 ? 'text-green-600' :
+                          aiAnalysis.householdIncome.savingsRate >= 10 ? 'text-yellow-600' : 'text-red-600'
+                        }`}>
+                          {aiAnalysis.householdIncome.savingsRate.toFixed(1)}%
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Grid 2 Colunas - Gauge e Renda vs Gastos */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
+                      {/* Savings Rate Gauge */}
+                      <div>
+                        <h4 className="text-sm font-semibold text-green-800 mb-3">Capacidade de Poupança</h4>
+                        <SavingsRateGauge rate={aiAnalysis.householdIncome.savingsRate} />
+                      </div>
+
+                      {/* Income vs Expenses Chart */}
+                      <div>
+                        <h4 className="text-sm font-semibold text-green-800 mb-3">Renda vs Gastos</h4>
+                        <IncomeVsExpensesChart data={aiAnalysis.householdIncome} />
+                      </div>
+                    </div>
+
+                    {/* Income Stability Chart - Largura Total */}
+                    <div className="mb-5">
+                      <h4 className="text-sm font-semibold text-green-800 mb-3">Estabilidade de Renda (6 Meses)</h4>
+                      <IncomeStabilityChart historicalData={aiAnalysis.householdIncome.historicalData} />
+                      <div className="mt-2 p-3 bg-white rounded-lg border border-green-200">
+                        <p className="text-sm text-gray-700">
+                          <span className="font-semibold">Score de Estabilidade:</span>{' '}
+                          <span className={`font-bold ${
+                            aiAnalysis.householdIncome.incomeStabilityScore >= 70 ? 'text-green-600' :
+                            aiAnalysis.householdIncome.incomeStabilityScore >= 40 ? 'text-yellow-600' : 'text-red-600'
+                          }`}>
+                            {aiAnalysis.householdIncome.incomeStabilityScore}/100 - {aiAnalysis.householdIncome.incomeStabilityStatus}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Budget Status Alert */}
+                    <div className={`p-4 rounded-lg border-l-4 ${
+                      aiAnalysis.householdIncome.budgetStatus === 'Excelente' ? 'bg-green-50 border-green-500' :
+                      aiAnalysis.householdIncome.budgetStatus === 'Bom' ? 'bg-blue-50 border-blue-500' :
+                      aiAnalysis.householdIncome.budgetStatus === 'Atenção' ? 'bg-yellow-50 border-yellow-500' :
+                      'bg-red-50 border-red-500'
+                    }`}>
+                      <p className="font-bold text-sm mb-2">
+                        Status do Orçamento: {aiAnalysis.householdIncome.budgetStatus}
+                      </p>
+                      {aiAnalysis.householdIncome.recommendations && aiAnalysis.householdIncome.recommendations.length > 0 && (
+                        <ul className="text-sm space-y-1">
+                          {aiAnalysis.householdIncome.recommendations.map((rec, idx) => (
+                            <li key={idx}>• {rec}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 📈 EVOLUÇÃO DOS GASTOS */}
+                {aiAnalysis.historicalData && aiAnalysis.historicalData.length > 0 && (
+                  <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="text-2xl">📈</span>
+                      <h3 className="text-lg font-bold text-slate-800">Evolução dos Gastos (6 Meses)</h3>
+                    </div>
+                    <SpendingTrendChart data={aiAnalysis.historicalData} />
+                  </div>
+                )}
+
+                {/* 💰 CONTEXTO ECONÔMICO */}
+                {aiAnalysis.economicContext && (
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-200 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="text-2xl">💰</span>
+                      <h3 className="text-lg font-bold text-blue-900">Contexto Econômico</h3>
+                    </div>
+
+                    {/* Cards Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+                      {aiAnalysis.economicContext.ipca && (
+                        <div className="bg-white rounded-lg p-3 text-center border border-red-200">
+                          <div className="text-2xl mb-1">📈</div>
+                          <div className="text-xs font-semibold text-gray-600 mb-1">IPCA</div>
+                          <div className="text-lg font-bold text-red-600">{aiAnalysis.economicContext.ipca.value.toFixed(2)}%</div>
+                        </div>
+                      )}
+                      {aiAnalysis.economicContext.igpm && (
+                        <div className="bg-white rounded-lg p-3 text-center border border-orange-200">
+                          <div className="text-2xl mb-1">📉</div>
+                          <div className="text-xs font-semibold text-gray-600 mb-1">IGP-M</div>
+                          <div className="text-lg font-bold text-orange-600">{aiAnalysis.economicContext.igpm.value.toFixed(2)}%</div>
+                        </div>
+                      )}
+                      {aiAnalysis.economicContext.selic && (
+                        <div className="bg-white rounded-lg p-3 text-center border border-purple-200">
+                          <div className="text-2xl mb-1">💰</div>
+                          <div className="text-xs font-semibold text-gray-600 mb-1">Selic</div>
+                          <div className="text-lg font-bold text-purple-600">{aiAnalysis.economicContext.selic.value.toFixed(2)}%</div>
+                        </div>
+                      )}
+                      {aiAnalysis.economicContext.usdBrl && (
+                        <div className="bg-white rounded-lg p-3 text-center border border-green-200">
+                          <div className="text-2xl mb-1">💵</div>
+                          <div className="text-xs font-semibold text-gray-600 mb-1">Dólar</div>
+                          <div className="text-lg font-bold text-green-600">R$ {aiAnalysis.economicContext.usdBrl.value.toFixed(2)}</div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Gráfico de Comparação com Inflação */}
+                    {aiAnalysis.historicalData && aiAnalysis.historicalData.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-semibold text-blue-800 mb-3">Gastos vs Inflação</h4>
+                        <InflationComparisonChart historicalData={aiAnalysis.historicalData} />
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Comparação */}
                 {aiAnalysis.comparison && (

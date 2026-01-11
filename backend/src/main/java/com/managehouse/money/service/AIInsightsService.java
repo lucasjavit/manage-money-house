@@ -33,6 +33,12 @@ public class AIInsightsService {
     @Autowired
     private ExpenseRepository expenseRepository;
 
+    @Autowired
+    private EconomicDataService economicDataService;
+
+    @Autowired
+    private HouseholdIncomeService householdIncomeService;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
@@ -49,7 +55,7 @@ public class AIInsightsService {
     }
 
     /**
-     * Gera análise mensal completa usando LangChain4j
+     * Gera análise mensal completa usando LangChain4j com contexto econômico
      */
     public AIMonthlyAnalysisResponse generateMonthlyAnalysis(Long userId, Integer month, Integer year) {
         ChatLanguageModel chatModel = getChatModel();
@@ -59,7 +65,7 @@ public class AIInsightsService {
         }
 
         try {
-            // 1. Coletar dados
+            // 1. Coletar dados de gastos
             List<Expense> currentMonthExpenses = expenseRepository.findByUserIdAndMonthAndYear(userId, month, year);
             List<Expense> historicalExpenses = getHistoricalExpenses(userId, month, year, 6);
 
@@ -67,17 +73,42 @@ public class AIInsightsService {
                 return getDefaultAnalysis();
             }
 
-            // 2. Construir contexto
-            String context = buildAnalysisContext(currentMonthExpenses, historicalExpenses, month, year);
+            // 2. Buscar contexto econômico (IPCA, SELIC, USD, IGP-M)
+            com.managehouse.money.dto.EconomicContextResponse economicContext = null;
+            try {
+                economicContext = economicDataService.fetchEconomicContext();
+                logger.info("Contexto econômico obtido com sucesso");
+            } catch (Exception e) {
+                logger.warn("Não foi possível obter contexto econômico. Continuando sem ele.", e);
+            }
 
-            // 3. Criar prompt estruturado
+            // 2.5. Buscar análise de renda da casa (Mariana + Lucas)
+            com.managehouse.money.dto.HouseholdIncomeAnalysis householdIncome = null;
+            try {
+                householdIncome = householdIncomeService.analyzeHouseholdIncome(month, year);
+                logger.info("Análise de renda da casa obtida com sucesso");
+            } catch (Exception e) {
+                logger.warn("Não foi possível obter análise de renda da casa. Continuando sem ela.", e);
+            }
+
+            // 3. Construir contexto de gastos
+            String context = buildAnalysisContext(currentMonthExpenses, historicalExpenses, month, year, economicContext, householdIncome);
+
+            // 4. Criar prompt estruturado com contexto econômico
             String prompt = buildMonthlyAnalysisPrompt(context);
 
-            // 4. Chamar LangChain4j
+            // 5. Chamar LangChain4j
             String response = chatModel.generate(prompt);
 
-            // 5. Parse JSON response
-            return parseMonthlyAnalysisResponse(response);
+            // 6. Parse JSON response
+            AIMonthlyAnalysisResponse analysis = parseMonthlyAnalysisResponse(response);
+
+            // 7. Adicionar contexto econômico, dados históricos e renda da casa à resposta
+            analysis.setEconomicContext(economicContext);
+            analysis.setHistoricalData(buildHistoricalData(userId, month, year, 6));
+            analysis.setHouseholdIncome(householdIncome);
+
+            return analysis;
 
         } catch (Exception e) {
             logger.error("Error generating AI analysis", e);
@@ -185,7 +216,9 @@ public class AIInsightsService {
         return historical;
     }
 
-    private String buildAnalysisContext(List<Expense> current, List<Expense> historical, Integer month, Integer year) {
+    private String buildAnalysisContext(List<Expense> current, List<Expense> historical, Integer month, Integer year,
+                                        com.managehouse.money.dto.EconomicContextResponse economicContext,
+                                        com.managehouse.money.dto.HouseholdIncomeAnalysis householdIncome) {
         StringBuilder sb = new StringBuilder();
 
         // Mês atual
@@ -220,6 +253,56 @@ public class AIInsightsService {
             sb.append("Total: R$ ").append(historicalTotal).append("\n");
             sb.append("Média mensal: R$ ").append(avgMonthly).append("\n");
             sb.append("Transações: ").append(historical.size()).append("\n");
+        }
+
+        // Contexto Econômico
+        if (economicContext != null) {
+            sb.append("\n=== CONTEXTO ECONÔMICO ===\n");
+
+            if (economicContext.getIpca() != null) {
+                sb.append("IPCA: ").append(economicContext.getIpca().getValue()).append("% ")
+                  .append("(período: ").append(economicContext.getIpca().getPeriod()).append(")\n");
+            }
+
+            if (economicContext.getIgpm() != null) {
+                sb.append("IGP-M: ").append(economicContext.getIgpm().getValue()).append("% ")
+                  .append("(período: ").append(economicContext.getIgpm().getPeriod()).append(")\n");
+            }
+
+            if (economicContext.getSelic() != null) {
+                sb.append("SELIC: ").append(economicContext.getSelic().getValue()).append("%\n");
+            }
+
+            if (economicContext.getUsdBrl() != null) {
+                sb.append("Dólar (USD/BRL): R$ ").append(economicContext.getUsdBrl().getValue())
+                  .append(" (variação: ").append(economicContext.getUsdBrl().getVariation()).append("%)\n");
+            }
+
+            sb.append("\nIMPORTANTE: Compare o crescimento dos gastos com a inflação (IPCA/IGP-M).\n");
+            sb.append("Considere o contexto de SELIC alta/baixa nas recomendações de investimento vs gasto.\n");
+        }
+
+        // Contexto de Renda da Casa (Mariana + Lucas)
+        if (householdIncome != null) {
+            sb.append("\n=== RENDA DA CASA (MARIANA + LUCAS) ===\n");
+            sb.append("Renda Mariana (fixa): R$ ").append(householdIncome.getMarianaIncome()).append("\n");
+            sb.append("Renda Lucas (variável USD): R$ ").append(householdIncome.getLucasNetIncome()).append("\n");
+            sb.append("  (Bruto USD convertido: R$ ").append(householdIncome.getLucasGrossIncome()).append(")\n");
+            sb.append("Renda Total da Casa: R$ ").append(householdIncome.getTotalHouseholdIncome()).append("\n");
+            sb.append("Gastos Totais: R$ ").append(householdIncome.getTotalExpenses()).append("\n");
+            sb.append("Poupança: R$ ").append(householdIncome.getSavings());
+            sb.append(" (").append(String.format("%.1f%%", householdIncome.getSavingsRate())).append(" da renda)\n");
+            sb.append("Proporção Gastos/Renda: ").append(String.format("%.1f%%", householdIncome.getExpenseToIncomeRatio())).append("\n");
+            sb.append("Estabilidade de Renda: ").append(householdIncome.getIncomeStabilityStatus())
+              .append(" (score: ").append(householdIncome.getIncomeStabilityScore()).append("/100)\n");
+
+            sb.append("\nIMPORTANTE:\n");
+            sb.append("- Analise se estão gastando dentro do orçamento familiar (renda vs gastos)\n");
+            sb.append("- Se gastos > renda, ALERTAR IMEDIATAMENTE com recomendações urgentes\n");
+            sb.append("- Se poupança < 10%, sugerir áreas específicas para cortar gastos\n");
+            sb.append("- Considere que Lucas tem renda variável em USD, então há volatilidade cambial\n");
+            sb.append("- Compare a poupança atual com metas saudáveis (idealmente 20%+)\n");
+            sb.append("- Recomende estratégias considerando a renda total da casa\n");
         }
 
         return sb.toString();
@@ -318,6 +401,50 @@ public class AIInsightsService {
             logger.error("Error parsing patterns JSON", e);
             return Collections.emptyList();
         }
+    }
+
+    /**
+     * Constrói dados históricos de 6 meses para os gráficos do frontend
+     */
+    private List<com.managehouse.money.dto.MonthlySpendingData> buildHistoricalData(Long userId, Integer currentMonth, Integer currentYear, int monthsBack) {
+        List<com.managehouse.money.dto.MonthlySpendingData> historicalData = new ArrayList<>();
+        YearMonth current = YearMonth.of(currentYear, currentMonth);
+
+        // Incluir o mês atual + 5 meses anteriores = 6 meses total
+        for (int i = monthsBack - 1; i >= 0; i--) {
+            YearMonth targetMonth = current.minusMonths(i);
+            List<Expense> monthExpenses = expenseRepository.findByUserIdAndMonthAndYear(
+                    userId,
+                    targetMonth.getMonthValue(),
+                    targetMonth.getYear()
+            );
+
+            // Calcular total do mês
+            BigDecimal total = monthExpenses.stream()
+                    .map(Expense::getAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            // Agrupar por categoria
+            Map<String, BigDecimal> byCategory = monthExpenses.stream()
+                    .collect(Collectors.groupingBy(
+                            e -> e.getExpenseType().getName(),
+                            Collectors.reducing(BigDecimal.ZERO, Expense::getAmount, BigDecimal::add)
+                    ));
+
+            List<com.managehouse.money.dto.MonthlySpendingData.CategoryAmount> categories = byCategory.entrySet().stream()
+                    .map(e -> new com.managehouse.money.dto.MonthlySpendingData.CategoryAmount(e.getKey(), e.getValue()))
+                    .collect(Collectors.toList());
+
+            com.managehouse.money.dto.MonthlySpendingData monthData = new com.managehouse.money.dto.MonthlySpendingData();
+            monthData.setMonth(targetMonth.toString()); // Formato: "2025-08"
+            monthData.setTotal(total);
+            monthData.setTransactionCount(monthExpenses.size());
+            monthData.setCategories(categories);
+
+            historicalData.add(monthData);
+        }
+
+        return historicalData;
     }
 
     private AIMonthlyAnalysisResponse getDefaultAnalysis() {
