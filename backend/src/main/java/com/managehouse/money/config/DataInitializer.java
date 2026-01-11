@@ -8,27 +8,103 @@ import com.managehouse.money.repository.ExpenseTypeRepository;
 import com.managehouse.money.repository.ExtractExpenseTypeRepository;
 import com.managehouse.money.repository.ExtractTransactionRepository;
 import com.managehouse.money.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 import java.util.List;
 
 @Component
-@RequiredArgsConstructor
+@Slf4j
 public class DataInitializer implements CommandLineRunner {
     private final UserRepository userRepository;
     private final ExpenseTypeRepository expenseTypeRepository;
     private final ExtractExpenseTypeRepository extractExpenseTypeRepository;
     private final ExtractTransactionRepository extractTransactionRepository;
+    
+    @PersistenceContext
+    private EntityManager entityManager;
+    
+    @Autowired
+    public DataInitializer(
+            UserRepository userRepository,
+            ExpenseTypeRepository expenseTypeRepository,
+            ExtractExpenseTypeRepository extractExpenseTypeRepository,
+            ExtractTransactionRepository extractTransactionRepository) {
+        this.userRepository = userRepository;
+        this.expenseTypeRepository = expenseTypeRepository;
+        this.extractExpenseTypeRepository = extractExpenseTypeRepository;
+        this.extractTransactionRepository = extractTransactionRepository;
+    }
 
     @Override
+    @Transactional
     public void run(String... args) {
+        fixExtractTransactionsSchema();
         initializeUsers();
         initializeExpenseTypes();
         initializeExtractExpenseTypes();
         migrateExtractTransactions();
+    }
+    
+    private void fixExtractTransactionsSchema() {
+        try {
+            log.info("Verificando e corrigindo schema da tabela extract_transactions...");
+            
+            // Verificar se a coluna antiga expense_type_id existe e tem constraint NOT NULL
+            String checkOldColumn = "SELECT COUNT(*) FROM information_schema.columns " +
+                    "WHERE table_name = 'extract_transactions' AND column_name = 'expense_type_id'";
+            
+            Long oldColumnExists = ((Number) entityManager.createNativeQuery(checkOldColumn).getSingleResult()).longValue();
+            
+            if (oldColumnExists > 0) {
+                log.info("Coluna antiga 'expense_type_id' encontrada. Removendo constraint NOT NULL...");
+                
+                // Tornar a coluna nullable
+                try {
+                    entityManager.createNativeQuery(
+                        "ALTER TABLE extract_transactions ALTER COLUMN expense_type_id DROP NOT NULL"
+                    ).executeUpdate();
+                    log.info("✓ Constraint NOT NULL removida da coluna expense_type_id");
+                } catch (Exception e) {
+                    log.warn("Não foi possível remover constraint NOT NULL (pode já estar nullable): {}", e.getMessage());
+                }
+            }
+            
+            // Verificar se extract_expense_type_id existe
+            String checkNewColumn = "SELECT COUNT(*) FROM information_schema.columns " +
+                    "WHERE table_name = 'extract_transactions' AND column_name = 'extract_expense_type_id'";
+            
+            Long newColumnExists = ((Number) entityManager.createNativeQuery(checkNewColumn).getSingleResult()).longValue();
+            
+            if (newColumnExists == 0) {
+                log.info("Coluna 'extract_expense_type_id' não encontrada. Criando...");
+                entityManager.createNativeQuery(
+                    "ALTER TABLE extract_transactions ADD COLUMN extract_expense_type_id BIGINT"
+                ).executeUpdate();
+                log.info("✓ Coluna extract_expense_type_id criada");
+            }
+            
+            // Garantir que extract_expense_type_id é nullable (para permitir migração de dados existentes)
+            try {
+                entityManager.createNativeQuery(
+                    "ALTER TABLE extract_transactions ALTER COLUMN extract_expense_type_id DROP NOT NULL"
+                ).executeUpdate();
+                log.info("✓ Coluna extract_expense_type_id configurada como nullable");
+            } catch (Exception e) {
+                log.debug("Coluna extract_expense_type_id já está nullable ou não tem constraint: {}", e.getMessage());
+            }
+            
+            log.info("✓ Schema da tabela extract_transactions corrigido com sucesso");
+        } catch (Exception e) {
+            log.error("Erro ao corrigir schema da tabela extract_transactions: {}", e.getMessage(), e);
+            // Não lançar exceção para não impedir a inicialização
+        }
     }
 
     private void initializeUsers() {

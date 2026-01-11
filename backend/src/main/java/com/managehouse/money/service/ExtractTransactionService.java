@@ -11,6 +11,7 @@ import com.managehouse.money.dto.IdentifiedTransaction;
 import com.managehouse.money.entity.ExtractExpenseType;
 import com.managehouse.money.entity.ExtractTransaction;
 import com.managehouse.money.entity.User;
+import com.managehouse.money.repository.ExtractExpenseTypeRepository;
 import com.managehouse.money.repository.ExtractTransactionRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class ExtractTransactionService {
     private final ExtractTransactionRepository extractTransactionRepository;
+    private final ExtractExpenseTypeRepository extractExpenseTypeRepository;
     private final UserService userService;
     private final ExtractExpenseTypeService extractExpenseTypeService;
     private final ExtractService extractService;
@@ -77,8 +79,24 @@ public class ExtractTransactionService {
                 }
                 
                 final IdentifiedTransaction finalTransaction = transactionToUse;
-                final Long expenseTypeId = finalTransaction.getExpenseTypeId();
-                
+
+                // Se ainda não tem tipo, usar "Outros" como fallback
+                final Long expenseTypeId;
+                if (finalTransaction.getExpenseTypeId() == null) {
+                    log.warn("Transação sem expenseTypeId após tentativas de melhoria. Usando 'Outros' como fallback: {}", finalTransaction.getDescription());
+                    ExtractExpenseType outrosType = extractExpenseTypeService.findByName("Outros")
+                            .orElseGet(() -> {
+                                log.warn("Tipo 'Outros' não encontrado! Criando...");
+                                ExtractExpenseType newOutros = new ExtractExpenseType();
+                                newOutros.setName("Outros");
+                                return extractExpenseTypeRepository.save(newOutros);
+                            });
+                    expenseTypeId = outrosType.getId();
+                    log.info("Usando 'Outros' (ID: {}) para transação: {}", expenseTypeId, finalTransaction.getDescription());
+                } else {
+                    expenseTypeId = finalTransaction.getExpenseTypeId();
+                }
+
                 ExtractExpenseType extractExpenseType = extractExpenseTypeService.findById(expenseTypeId)
                         .orElseThrow(() -> {
                             log.error("ERRO: ExtractExpenseType não encontrado com ID: {}", expenseTypeId);
@@ -109,7 +127,22 @@ public class ExtractTransactionService {
                 savedResponses.add(toResponse(saved));
             } catch (Exception e) {
                 log.error("ERRO ao salvar transação: {}", originalTransaction.getDescription(), e);
-                throw new RuntimeException("Erro ao salvar transação: " + originalTransaction.getDescription() + " - " + e.getMessage(), e);
+
+                // Transformar erro técnico em mensagem amigável
+                String friendlyMessage;
+                String errorMessage = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+
+                if (errorMessage.contains("expense_type_id") || errorMessage.contains("not-null constraint")) {
+                    friendlyMessage = "A transação '" + originalTransaction.getDescription() + "' não pôde ser categorizada automaticamente. Por favor, revise e tente novamente.";
+                } else if (errorMessage.contains("duplicate") || errorMessage.contains("unique")) {
+                    friendlyMessage = "A transação '" + originalTransaction.getDescription() + "' já foi salva anteriormente.";
+                } else if (errorMessage.contains("foreign key") || errorMessage.contains("violates")) {
+                    friendlyMessage = "Dados inválidos para a transação '" + originalTransaction.getDescription() + "'. Verifique as informações e tente novamente.";
+                } else {
+                    friendlyMessage = "Erro ao processar a transação '" + originalTransaction.getDescription() + "'. Verifique os dados e tente novamente.";
+                }
+
+                throw new RuntimeException(friendlyMessage, e);
             }
         }
         

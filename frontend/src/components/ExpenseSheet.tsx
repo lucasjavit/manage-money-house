@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { expenseService } from '../services/expenseService';
 import { recurringExpenseService } from '../services/recurringExpenseService';
-import type { Expense, ExpenseRequest, ExpenseType, ExpenseAlertsResponse } from '../types';
+import { aiService } from '../services/aiService';
+import type { Expense, ExpenseRequest, ExpenseType, ExpenseAlertsResponse, AIMonthlyAnalysis } from '../types';
 import RecurringExpenseButton from './RecurringExpenseButton';
 
 const ExpenseSheet = () => {
@@ -24,7 +25,10 @@ const ExpenseSheet = () => {
   const [newTypeName, setNewTypeName] = useState('');
   const [alerts, setAlerts] = useState<ExpenseAlertsResponse | null>(null);
   const [loadingAlerts, setLoadingAlerts] = useState(false);
-  const [showAlerts, setShowAlerts] = useState(true);
+  const [showAlerts, setShowAlerts] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState<AIMonthlyAnalysis | null>(null);
+  const [loadingAiAnalysis, setLoadingAiAnalysis] = useState(false);
+  const [showAiAnalysisModal, setShowAiAnalysisModal] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const monthNames = [
@@ -80,10 +84,59 @@ const ExpenseSheet = () => {
     try {
       const alertsData = await expenseService.getExpenseAlerts(user.id, year, selectedMonth);
       setAlerts(alertsData);
+
+      // Extrair análise AI se disponível
+      if (alertsData.aiAnalysis) {
+        setAiAnalysis(alertsData.aiAnalysis);
+      }
     } catch (error) {
       console.error('Error loading alerts:', error);
     } finally {
       setLoadingAlerts(false);
+    }
+  };
+
+  const handleGenerateAiAnalysis = async () => {
+    if (!user) return;
+    setLoadingAiAnalysis(true);
+    try {
+      const analysis = await aiService.analyzeMonth(user.id, selectedMonth, year);
+      setAiAnalysis(analysis);
+      setShowAiAnalysisModal(true);
+    } catch (error: any) {
+      console.error('Error generating AI analysis:', error);
+
+      // Mensagem amigável baseada no tipo de erro
+      let errorMessage = '❌ Não foi possível gerar a análise IA.\n\n';
+
+      if (error.code === 'ERR_NETWORK' || error.message?.includes('Network Error')) {
+        errorMessage += '🔴 O servidor backend não está respondendo.\n\n';
+        errorMessage += '📝 Instruções:\n';
+        errorMessage += '1. Abra um terminal na pasta "backend"\n';
+        errorMessage += '2. Execute: mvn spring-boot:run\n';
+        errorMessage += '3. Aguarde a mensagem "Started ManageHouseMoneyApplication"\n';
+        errorMessage += '4. Tente novamente';
+      } else if (error.response?.status === 404) {
+        errorMessage += '🔍 Endpoint não encontrado (404).\n\n';
+        errorMessage += 'Certifique-se de que:\n';
+        errorMessage += '• O backend está rodando na porta 3001\n';
+        errorMessage += '• O AIAnalysisController está compilado\n';
+        errorMessage += '• Execute: mvn spring-boot:run na pasta backend';
+      } else if (error.response?.status === 500) {
+        errorMessage += '⚠️ Erro interno do servidor.\n\n';
+        errorMessage += 'Possíveis causas:\n';
+        errorMessage += '• API key do OpenAI não configurada\n';
+        errorMessage += '• Erro na geração da análise\n\n';
+        errorMessage += 'Verifique os logs do backend para mais detalhes.';
+      } else {
+        errorMessage += '⚠️ Erro desconhecido.\n\n';
+        errorMessage += `Detalhes: ${error.message || 'Erro ao comunicar com o servidor'}\n\n`;
+        errorMessage += 'Verifique se o backend está rodando e tente novamente.';
+      }
+
+      alert(errorMessage);
+    } finally {
+      setLoadingAiAnalysis(false);
     }
   };
 
@@ -376,136 +429,169 @@ const ExpenseSheet = () => {
 
   return (
     <div className="space-y-6">
-      {/* Alertas Inteligentes */}
-      {alerts && alerts.alerts.length > 0 && showAlerts && (
-        <div className="bg-gradient-to-br from-orange-50 via-yellow-50 to-red-50 rounded-2xl shadow-lg border-2 border-orange-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-md ${
-                alerts.summary.overallStatus === 'critical' ? 'bg-gradient-to-br from-red-500 to-red-600' :
-                alerts.summary.overallStatus === 'attention' ? 'bg-gradient-to-br from-yellow-500 to-orange-500' :
-                'bg-gradient-to-br from-green-500 to-green-600'
-              }`}>
-                <span className="text-3xl">
-                  {alerts.summary.overallStatus === 'critical' ? '🚨' :
-                   alerts.summary.overallStatus === 'attention' ? '⚠️' : '✅'}
-                </span>
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-slate-800">Alertas Inteligentes</h2>
-                <p className="text-sm text-slate-600">
-                  {alerts.summary.totalAlerts} alerta{alerts.summary.totalAlerts !== 1 ? 's' : ''} detectado{alerts.summary.totalAlerts !== 1 ? 's' : ''} para {
-                    ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'][selectedMonth - 1]
-                  } {year}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowAlerts(false)}
-              className="text-slate-500 hover:text-slate-700 p-2 hover:bg-white/50 rounded-lg transition-colors"
-              title="Fechar alertas"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Resumo */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
-            <div className="bg-white/70 rounded-lg p-3 border border-orange-200">
-              <p className="text-xs font-semibold text-slate-600 uppercase">Total do Mês</p>
-              <p className="text-lg font-bold text-slate-800">
-                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(alerts.summary.totalMonthSpent)}
-              </p>
-            </div>
-            <div className="bg-white/70 rounded-lg p-3 border border-orange-200">
-              <p className="text-xs font-semibold text-slate-600 uppercase">Média Histórica</p>
-              <p className="text-lg font-bold text-slate-800">
-                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(alerts.summary.averageMonthSpent)}
-              </p>
-            </div>
-            <div className="bg-white/70 rounded-lg p-3 border border-orange-200">
-              <p className="text-xs font-semibold text-slate-600 uppercase">Diferença</p>
-              <p className={`text-lg font-bold ${
-                alerts.summary.totalMonthSpent > alerts.summary.averageMonthSpent ? 'text-red-600' : 'text-green-600'
-              }`}>
-                {alerts.summary.totalMonthSpent > alerts.summary.averageMonthSpent ? '+' : ''}
-                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(
-                  alerts.summary.totalMonthSpent - alerts.summary.averageMonthSpent
-                )}
-              </p>
-            </div>
-          </div>
-
-          {/* Lista de Alertas */}
-          <div className="space-y-3">
-            {alerts.alerts.slice(0, 5).map((alert, idx) => (
-              <div
-                key={idx}
-                className={`bg-white rounded-lg p-4 border-2 shadow-sm hover:shadow-md transition-shadow ${
-                  alert.severity === 'critical' ? 'border-red-300 bg-red-50/50' :
-                  alert.severity === 'warning' ? 'border-yellow-300 bg-yellow-50/50' :
-                  'border-slate-200'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <span className="text-3xl flex-shrink-0">{alert.icon}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-bold text-slate-900">{alert.expenseTypeName}</h3>
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                        alert.severity === 'critical' ? 'bg-red-200 text-red-700' :
-                        alert.severity === 'warning' ? 'bg-yellow-200 text-yellow-800' :
-                        'bg-slate-200 text-slate-700'
-                      }`}>
-                        {alert.severity === 'critical' ? 'CRÍTICO' :
-                         alert.severity === 'warning' ? 'ATENÇÃO' : 'INFO'}
-                      </span>
-                      {alert.isHistoricalMax && (
-                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-200 text-purple-700">
-                          RECORDE
-                        </span>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm mb-2">
-                      <div>
-                        <span className="text-slate-600">Atual: </span>
-                        <span className="font-bold text-red-600">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(alert.currentValue)}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-slate-600">Média: </span>
-                        <span className="font-semibold text-slate-700">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(alert.averageValue)}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-slate-600">Variação: </span>
-                        <span className={`font-bold ${alert.percentageAboveAverage > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                          {alert.percentageAboveAverage > 0 ? '+' : ''}{alert.percentageAboveAverage.toFixed(1)}%
-                        </span>
-                      </div>
-                    </div>
-                    <p className="text-sm text-slate-700 italic">{alert.suggestion}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Botão para reabrir alertas se estiver oculto */}
-      {alerts && alerts.alerts.length > 0 && !showAlerts && (
+      {/* Botão Flutuante de Alertas */}
+      {alerts && alerts.alerts.length > 0 && (
         <button
           onClick={() => setShowAlerts(true)}
-          className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 rounded-xl font-semibold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
+          className="fixed bottom-6 right-6 z-40 w-16 h-16 bg-gradient-to-br from-orange-500 to-red-600 text-white rounded-full shadow-2xl hover:shadow-orange-500/50 hover:scale-110 transition-all flex items-center justify-center group"
+          title="Ver Alertas Inteligentes"
         >
-          <span className="text-xl">🚨</span>
-          Mostrar Alertas Inteligentes ({alerts.summary.totalAlerts})
+          <div className="relative">
+            <span className="text-3xl animate-pulse">🚨</span>
+            {alerts.summary.totalAlerts > 0 && (
+              <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center border-2 border-white">
+                {alerts.summary.totalAlerts}
+              </span>
+            )}
+          </div>
         </button>
+      )}
+
+      {/* Modal de Alertas */}
+      {alerts && alerts.alerts.length > 0 && showAlerts && (
+        <>
+          {/* Overlay */}
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity"
+            onClick={() => setShowAlerts(false)}
+          />
+
+          {/* Modal */}
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div
+              className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className={`flex items-center justify-between p-6 border-b-2 ${
+                alerts.summary.overallStatus === 'critical' ? 'bg-gradient-to-r from-red-50 to-orange-50 border-red-200' :
+                alerts.summary.overallStatus === 'attention' ? 'bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-200' :
+                'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200'
+              }`}>
+                <div className="flex items-center gap-3">
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-md ${
+                    alerts.summary.overallStatus === 'critical' ? 'bg-gradient-to-br from-red-500 to-red-600' :
+                    alerts.summary.overallStatus === 'attention' ? 'bg-gradient-to-br from-yellow-500 to-orange-500' :
+                    'bg-gradient-to-br from-green-500 to-green-600'
+                  }`}>
+                    <span className="text-3xl">
+                      {alerts.summary.overallStatus === 'critical' ? '🚨' :
+                       alerts.summary.overallStatus === 'attention' ? '⚠️' : '✅'}
+                    </span>
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-800">Alertas Inteligentes</h2>
+                    <p className="text-sm text-slate-600">
+                      {alerts.summary.totalAlerts} alerta{alerts.summary.totalAlerts !== 1 ? 's' : ''} detectado{alerts.summary.totalAlerts !== 1 ? 's' : ''} para {fullMonthNames[selectedMonth - 1]} {year}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowAlerts(false)}
+                  className="text-slate-500 hover:text-slate-700 p-2 hover:bg-white/50 rounded-lg transition-colors"
+                  title="Fechar"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {/* Resumo */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-4 border border-slate-200">
+                    <p className="text-xs font-semibold text-slate-600 uppercase mb-1">Total do Mês</p>
+                    <p className="text-2xl font-bold text-slate-800">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(alerts.summary.totalMonthSpent)}
+                    </p>
+                  </div>
+                  <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border border-blue-200">
+                    <p className="text-xs font-semibold text-blue-600 uppercase mb-1">Média Histórica</p>
+                    <p className="text-2xl font-bold text-blue-800">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(alerts.summary.averageMonthSpent)}
+                    </p>
+                  </div>
+                  <div className={`rounded-xl p-4 border ${
+                    alerts.summary.totalMonthSpent > alerts.summary.averageMonthSpent
+                      ? 'bg-gradient-to-br from-red-50 to-orange-50 border-red-200'
+                      : 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200'
+                  }`}>
+                    <p className="text-xs font-semibold text-slate-600 uppercase mb-1">Diferença</p>
+                    <p className={`text-2xl font-bold ${
+                      alerts.summary.totalMonthSpent > alerts.summary.averageMonthSpent ? 'text-red-600' : 'text-green-600'
+                    }`}>
+                      {alerts.summary.totalMonthSpent > alerts.summary.averageMonthSpent ? '+' : ''}
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(
+                        alerts.summary.totalMonthSpent - alerts.summary.averageMonthSpent
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Lista de Alertas */}
+                <div className="space-y-4">
+                  {alerts.alerts.map((alert, idx) => (
+                    <div
+                      key={idx}
+                      className={`bg-white rounded-xl p-5 border-2 shadow-sm hover:shadow-md transition-all ${
+                        alert.severity === 'critical' ? 'border-red-300 bg-red-50/30' :
+                        alert.severity === 'warning' ? 'border-yellow-300 bg-yellow-50/30' :
+                        'border-slate-200 bg-slate-50/30'
+                      }`}
+                    >
+                      <div className="flex items-start gap-4">
+                        <span className="text-4xl flex-shrink-0">{alert.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 mb-2">
+                            <h3 className="font-bold text-lg text-slate-900">{alert.expenseTypeName}</h3>
+                            <span className={`text-xs font-semibold px-3 py-1 rounded-full ${
+                              alert.severity === 'critical' ? 'bg-red-500 text-white' :
+                              alert.severity === 'warning' ? 'bg-yellow-500 text-white' :
+                              'bg-slate-400 text-white'
+                            }`}>
+                              {alert.severity === 'critical' ? 'CRÍTICO' :
+                               alert.severity === 'warning' ? 'ATENÇÃO' : 'INFO'}
+                            </span>
+                            {alert.isHistoricalMax && (
+                              <span className="text-xs font-semibold px-3 py-1 rounded-full bg-purple-500 text-white">
+                                RECORDE
+                              </span>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                            <div className="bg-white/70 rounded-lg p-2 border border-red-200">
+                              <span className="text-xs text-slate-600 block">Atual:</span>
+                              <span className="font-bold text-red-600 text-lg">
+                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(alert.currentValue)}
+                              </span>
+                            </div>
+                            <div className="bg-white/70 rounded-lg p-2 border border-slate-200">
+                              <span className="text-xs text-slate-600 block">Média:</span>
+                              <span className="font-semibold text-slate-700 text-lg">
+                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(alert.averageValue)}
+                              </span>
+                            </div>
+                            <div className="bg-white/70 rounded-lg p-2 border border-orange-200">
+                              <span className="text-xs text-slate-600 block">Variação:</span>
+                              <span className={`font-bold text-lg ${alert.percentageAboveAverage > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                {alert.percentageAboveAverage > 0 ? '+' : ''}{alert.percentageAboveAverage.toFixed(1)}%
+                              </span>
+                            </div>
+                          </div>
+                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                            <p className="text-sm text-blue-900 font-medium">💡 {alert.suggestion}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -563,6 +649,93 @@ const ExpenseSheet = () => {
               </div>
             </div>
       </div>
+
+      {/* Botão Gerar Análise IA */}
+      <div className="flex justify-center mb-6">
+        <button
+          onClick={handleGenerateAiAnalysis}
+          disabled={loadingAiAnalysis}
+          className="px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          {loadingAiAnalysis ? (
+            <>
+              <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
+              Gerando Análise...
+            </>
+          ) : (
+            <>
+              <span className="text-2xl">🤖</span>
+              Gerar Análise IA Completa
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Card de Insights IA */}
+      {aiAnalysis && (
+        <div className="bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 p-6 rounded-2xl shadow-md border-2 border-purple-200/60 hover:shadow-lg transition-shadow mb-6">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-2xl">🤖</span>
+                <p className="text-sm font-semibold text-purple-800 uppercase tracking-wide">
+                  Análise Inteligente
+                </p>
+              </div>
+
+              {/* Score de Saúde Financeira */}
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-purple-600 font-medium">Saúde Financeira</span>
+                  <span className="text-lg font-bold text-purple-700">
+                    {aiAnalysis.financialHealthScore}/100
+                  </span>
+                </div>
+                <div className="w-full bg-purple-200 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full transition-all ${
+                      aiAnalysis.financialHealthScore >= 70 ? 'bg-green-500' :
+                      aiAnalysis.financialHealthScore >= 40 ? 'bg-yellow-500' :
+                      'bg-red-500'
+                    }`}
+                    style={{ width: `${aiAnalysis.financialHealthScore}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Resumo Executivo */}
+              <p className="text-sm text-purple-900 mb-3">
+                {aiAnalysis.executiveSummary}
+              </p>
+
+              {/* Previsão Próximo Mês */}
+              {aiAnalysis.nextMonthPrediction && (
+                <div className="bg-white/50 rounded-lg p-3 mb-3">
+                  <p className="text-xs font-semibold text-purple-600 mb-1">
+                    📊 Previsão Próximo Mês
+                  </p>
+                  <p className="text-lg font-bold text-purple-800">
+                    {formatCurrency(aiAnalysis.nextMonthPrediction.predictedAmount)}
+                  </p>
+                  <p className="text-xs text-purple-600 mt-1">
+                    Confiança: {(aiAnalysis.nextMonthPrediction.confidence * 100).toFixed(0)}%
+                  </p>
+                </div>
+              )}
+
+              {/* Botão Ver Detalhes */}
+              <button
+                onClick={() => setShowAiAnalysisModal(true)}
+                className="text-sm font-semibold text-purple-700 hover:text-purple-900 underline"
+              >
+                Ver Análise Completa →
+              </button>
+            </div>
+
+            <div className="text-4xl opacity-80 ml-4">🎯</div>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-md overflow-hidden border-2 border-slate-200/60">
         <div className="flex justify-between items-center bg-slate-50/80 p-4 border-b-2 border-slate-200/60">
@@ -862,6 +1035,176 @@ const ExpenseSheet = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal de Análise IA Completa */}
+      {showAiAnalysisModal && aiAnalysis && (
+        <>
+          {/* Overlay */}
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity"
+            onClick={() => setShowAiAnalysisModal(false)}
+          />
+
+          {/* Modal */}
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div
+              className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b-2 border-purple-200/50 bg-gradient-to-r from-purple-50 to-indigo-50">
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">🤖</span>
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-800">Análise Inteligente Completa</h2>
+                    <p className="text-sm text-slate-600">
+                      {fullMonthNames[selectedMonth - 1]} {year}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowAiAnalysisModal(false)}
+                  className="text-slate-500 hover:text-slate-700 p-2 hover:bg-white/50 rounded-lg transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {/* Score de Saúde */}
+                <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-4 border border-purple-200">
+                  <p className="text-sm font-semibold text-purple-800 mb-2">Saúde Financeira</p>
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                      <div className="w-full bg-purple-200 rounded-full h-3">
+                        <div
+                          className={`h-3 rounded-full ${
+                            aiAnalysis.financialHealthScore >= 70 ? 'bg-green-500' :
+                            aiAnalysis.financialHealthScore >= 40 ? 'bg-yellow-500' :
+                            'bg-red-500'
+                          }`}
+                          style={{ width: `${aiAnalysis.financialHealthScore}%` }}
+                        />
+                      </div>
+                    </div>
+                    <span className="text-2xl font-bold text-purple-700">
+                      {aiAnalysis.financialHealthScore}/100
+                    </span>
+                  </div>
+                </div>
+
+                {/* Resumo Executivo */}
+                <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+                  <p className="text-sm font-semibold text-slate-700 mb-2">📋 Resumo Executivo</p>
+                  <p className="text-slate-700">{aiAnalysis.executiveSummary}</p>
+                </div>
+
+                {/* Comparação */}
+                {aiAnalysis.comparison && (
+                  <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+                    <p className="text-sm font-semibold text-slate-700 mb-3">📊 Comparações</p>
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-2">
+                        <span className="text-sm font-medium text-slate-600 min-w-[120px]">vs Mês Anterior:</span>
+                        <span className="text-sm text-slate-700">{aiAnalysis.comparison.vsLastMonth}</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="text-sm font-medium text-slate-600 min-w-[120px]">vs Média:</span>
+                        <span className="text-sm text-slate-700">{aiAnalysis.comparison.vsAverage}</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="text-sm font-medium text-slate-600 min-w-[120px]">Tendência:</span>
+                        <span className={`text-sm font-semibold ${
+                          aiAnalysis.comparison.trend === 'increasing' ? 'text-red-600' :
+                          aiAnalysis.comparison.trend === 'decreasing' ? 'text-green-600' :
+                          'text-slate-600'
+                        }`}>
+                          {aiAnalysis.comparison.trend === 'increasing' ? '📈 Crescente' :
+                           aiAnalysis.comparison.trend === 'decreasing' ? '📉 Decrescente' :
+                           '➡️ Estável'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Padrões Detectados */}
+                {aiAnalysis.patternsDetected && aiAnalysis.patternsDetected.length > 0 && (
+                  <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+                    <p className="text-sm font-semibold text-slate-700 mb-3">🔍 Padrões Identificados</p>
+                    <div className="space-y-3">
+                      {aiAnalysis.patternsDetected.map((pattern, idx) => (
+                        <div key={idx} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
+                          <span className="text-2xl">{pattern.icon}</span>
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold text-slate-800 mb-1">
+                              {pattern.description}
+                            </p>
+                            <p className="text-xs text-slate-600">{pattern.insight}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Previsão Próximo Mês */}
+                {aiAnalysis.nextMonthPrediction && (
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
+                    <p className="text-sm font-semibold text-blue-800 mb-3">🔮 Previsão para o Próximo Mês</p>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-blue-700">Valor Previsto:</span>
+                        <span className="text-2xl font-bold text-blue-800">
+                          {formatCurrency(aiAnalysis.nextMonthPrediction.predictedAmount)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-blue-700">Confiança:</span>
+                        <span className="text-sm font-semibold text-blue-800">
+                          {(aiAnalysis.nextMonthPrediction.confidence * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                      <div className="bg-white/50 rounded-lg p-3">
+                        <p className="text-xs font-semibold text-blue-700 mb-1">Raciocínio:</p>
+                        <p className="text-sm text-blue-900">{aiAnalysis.nextMonthPrediction.reasoning}</p>
+                      </div>
+                      {aiAnalysis.nextMonthPrediction.assumptions && aiAnalysis.nextMonthPrediction.assumptions.length > 0 && (
+                        <div>
+                          <p className="text-xs font-semibold text-blue-700 mb-2">Premissas:</p>
+                          <ul className="list-disc list-inside space-y-1">
+                            {aiAnalysis.nextMonthPrediction.assumptions.map((assumption, idx) => (
+                              <li key={idx} className="text-xs text-blue-800">{assumption}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Recomendações */}
+                {aiAnalysis.recommendations && aiAnalysis.recommendations.length > 0 && (
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200">
+                    <p className="text-sm font-semibold text-green-800 mb-3">💡 Recomendações</p>
+                    <ul className="space-y-2">
+                      {aiAnalysis.recommendations.map((rec, idx) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <span className="text-green-600 mt-0.5">✓</span>
+                          <span className="text-sm text-green-900">{rec}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

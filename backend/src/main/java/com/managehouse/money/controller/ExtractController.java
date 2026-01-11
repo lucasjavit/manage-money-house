@@ -176,10 +176,7 @@ public class ExtractController {
             log.debug("Data é null");
             return false;
         }
-        if (transaction.getExpenseTypeId() == null) {
-            log.debug("ExpenseTypeId é null");
-            return false;
-        }
+        // Não validar expenseTypeId aqui - o ExtractService já garante que será preenchido com fallback "Outros"
         // Validar se a data está em um range razoável (2020-2030)
         int year = transaction.getDate().getYear();
         if (year < 2020 || year > 2030) {

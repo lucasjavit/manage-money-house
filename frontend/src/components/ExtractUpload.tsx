@@ -23,6 +23,7 @@ const ExtractUpload = () => {
   
   const [selectedMonth, setSelectedMonth] = useState<number>(getCurrentMonth());
   const [selectedYear, setSelectedYear] = useState<number>(getCurrentYear());
+  const [showInsightsModal, setShowInsightsModal] = useState(false);
 
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -163,8 +164,35 @@ const ExtractUpload = () => {
     try {
       const data = await extractService.getInsights(user.id, selectedMonth, selectedYear);
       setInsights(data);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao carregar insights:', err);
+
+      // Mensagem amigável baseada no tipo de erro
+      let errorMessage = '❌ Não foi possível carregar a análise financeira.\n\n';
+
+      if (err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
+        errorMessage += '🔴 O servidor backend não está respondendo.\n\n';
+        errorMessage += '📝 Para iniciar o servidor:\n';
+        errorMessage += '1. Abra um terminal na pasta "backend"\n';
+        errorMessage += '2. Execute: mvn spring-boot:run\n';
+        errorMessage += '3. Aguarde inicializar completamente\n';
+        errorMessage += '4. Clique em "Atualizar" novamente';
+      } else if (err.response?.status === 404) {
+        errorMessage += '🔍 Serviço não encontrado.\n\n';
+        errorMessage += 'Verifique se o backend está rodando:\n';
+        errorMessage += 'Execute: mvn spring-boot:run na pasta backend';
+      } else if (err.response?.status === 500) {
+        errorMessage += '⚠️ Erro ao processar análise.\n\n';
+        errorMessage += 'Possíveis causas:\n';
+        errorMessage += '• Sem transações no período selecionado\n';
+        errorMessage += '• Erro no processamento dos dados\n\n';
+        errorMessage += 'Tente selecionar outro mês/ano.';
+      } else {
+        errorMessage += `Detalhes: ${err.message || 'Erro desconhecido'}\n\n`;
+        errorMessage += 'Certifique-se de que o backend está rodando.';
+      }
+
+      alert(errorMessage);
     } finally {
       setLoadingInsights(false);
     }
@@ -241,9 +269,25 @@ const ExtractUpload = () => {
       }
     } catch (err: any) {
       console.error('Erro ao salvar transações:', err);
-      const errorMessage = err.response?.data?.error || err.message || 'Erro ao salvar transações.';
+
+      // Transformar erro técnico em mensagem amigável
+      let errorMessage = 'Erro ao salvar transações.';
+
+      if (err.response?.data?.error) {
+        const backendError = err.response.data.error;
+
+        // Detectar erro de constraint do banco (expense_type_id)
+        if (backendError.includes('expense_type_id') || backendError.includes('not-null constraint')) {
+          errorMessage = 'Algumas transações não puderam ser categorizadas automaticamente. Por favor, revise o extrato e tente novamente.';
+        } else if (backendError.includes('duplicate') || backendError.includes('unique')) {
+          errorMessage = 'Algumas transações já foram salvas anteriormente.';
+        } else {
+          errorMessage = 'Erro ao processar as transações. Verifique o arquivo e tente novamente.';
+        }
+      }
+
       setError(errorMessage);
-      alert(`Erro: ${errorMessage}`);
+      alert(`❌ ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -551,298 +595,407 @@ const ExtractUpload = () => {
         </div>
       </div>
 
-      {/* Seção de Insights - Melhorada */}
+      {/* Botão Flutuante de Análise Financeira */}
       {savedTransactions.length > 0 && (
-        <div className="bg-gradient-to-br from-blue-50 via-white to-purple-50 rounded-2xl shadow-lg border-2 border-slate-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md">
-                <span className="text-2xl">📊</span>
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-slate-800">Análise Financeira</h2>
-                <p className="text-xs text-slate-600">Insights do seu mês</p>
-              </div>
-            </div>
-            <button
-              onClick={loadInsights}
-              disabled={loadingInsights}
-              className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              <span>{loadingInsights ? 'Analisando...' : 'Atualizar'}</span>
-              {loadingInsights ? '⏳' : '🔄'}
-            </button>
+        <button
+          onClick={() => {
+            if (!insights) {
+              loadInsights();
+            }
+            setShowInsightsModal(true);
+          }}
+          className="fixed bottom-6 right-6 z-40 w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 text-white rounded-full shadow-2xl hover:shadow-blue-500/50 hover:scale-110 transition-all flex items-center justify-center group"
+          title="Ver Análise Financeira"
+        >
+          <div className="relative">
+            <span className="text-3xl">📊</span>
+            {insights && (
+              <span className="absolute -top-2 -right-2 bg-green-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center border-2 border-white">
+                ✓
+              </span>
+            )}
           </div>
+        </button>
+      )}
 
-          {loadingInsights ? (
-            <div className="flex justify-center py-4">
-              <svg className="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-            </div>
-          ) : insights ? (
-            <>
-              {/* Cards Principais - Melhorados com Quick Stats */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                {/* Total Gasto */}
-                <div className="bg-gradient-to-br from-red-50 to-red-100 border-2 border-red-200 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-2xl">💰</span>
-                    <span className="text-xs font-semibold text-red-700 bg-red-200 px-2 py-1 rounded-full">Total</span>
-                  </div>
-                  <p className="text-2xl font-bold text-red-700 mb-1">
-                    {new Intl.NumberFormat('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                      maximumFractionDigits: 0,
-                    }).format(insights.totalSpent || 0)}
-                  </p>
-                  <p className="text-xs text-red-600">Gastos do mês</p>
-                </div>
+      {/* Modal de Análise Financeira */}
+      {showInsightsModal && (
+        <>
+          {/* Overlay */}
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 animate-fadeIn"
+            onClick={() => setShowInsightsModal(false)}
+          />
 
-                {/* Transações */}
-                <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-2xl">📊</span>
-                    <span className="text-xs font-semibold text-blue-700 bg-blue-200 px-2 py-1 rounded-full">Qtd</span>
-                  </div>
-                  <p className="text-2xl font-bold text-blue-700 mb-1">{insights.totalTransactions || 0}</p>
-                  <p className="text-xs text-blue-600">Transações</p>
-                </div>
-
-                {/* Média */}
-                {insights.averagePerTransaction && (
-                  <div className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-2xl">📈</span>
-                      <span className="text-xs font-semibold text-green-700 bg-green-200 px-2 py-1 rounded-full">Média</span>
+          {/* Modal */}
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-blue-500 via-purple-600 to-blue-600 text-white px-8 py-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                      <span className="text-4xl">📊</span>
                     </div>
-                    <p className="text-2xl font-bold text-green-700 mb-1">
-                      {new Intl.NumberFormat('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL',
-                        maximumFractionDigits: 0,
-                      }).format(insights.averagePerTransaction)}
-                    </p>
-                    <p className="text-xs text-green-600">Por transação</p>
+                    <div>
+                      <h2 className="text-2xl font-bold">Análise Financeira Completa</h2>
+                      <p className="text-blue-100 text-sm mt-1">
+                        Insights detalhados do seu mês
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={loadInsights}
+                      disabled={loadingInsights}
+                      className="px-4 py-2 text-sm font-semibold bg-white/20 hover:bg-white/30 rounded-lg transition-all backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      <span>{loadingInsights ? 'Analisando...' : 'Atualizar'}</span>
+                      {loadingInsights ? '⏳' : '🔄'}
+                    </button>
+                    <button
+                      onClick={() => setShowInsightsModal(false)}
+                      className="text-white hover:bg-white/20 rounded-lg p-2 transition-colors"
+                    >
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Conteúdo Scrollable */}
+              <div className="overflow-y-auto max-h-[calc(90vh-120px)] p-8 bg-gradient-to-br from-blue-50/30 via-white to-purple-50/30">
+                {loadingInsights ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-4">
+                    <svg className="animate-spin h-12 w-12 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <p className="text-slate-600 font-medium">Carregando análise financeira...</p>
+                  </div>
+                ) : insights ? (
+                  <div className="space-y-6">
+                    {/* Cards Principais - Reorganizados e Otimizados */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                      {/* 1. Total Gasto - PRINCIPAL */}
+                      <div className="bg-gradient-to-br from-red-50 to-red-100 border-2 border-red-200 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-2xl">💰</span>
+                          <span className="text-xs font-semibold text-red-700 bg-red-200 px-2 py-1 rounded-full">Total</span>
+                        </div>
+                        <p className="text-2xl font-bold text-red-700 mb-1">
+                          {new Intl.NumberFormat('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                            maximumFractionDigits: 0,
+                          }).format(insights.totalSpent || 0)}
+                        </p>
+                        <p className="text-xs text-red-600">Gastos do mês</p>
+                      </div>
+
+                      {/* 2. Tendência vs Mês Anterior - COMPARAÇÃO IMPORTANTE */}
+                      {insights.trends && insights.trends.length > 0 && (
+                        <div className={`bg-gradient-to-br border-2 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow ${
+                          insights.trends[0].type === 'increase' ? 'from-red-50 to-red-100 border-red-200' :
+                          insights.trends[0].type === 'decrease' ? 'from-green-50 to-green-100 border-green-200' :
+                          'from-slate-50 to-slate-100 border-slate-200'
+                        }`}>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-2xl">{insights.trends[0].type === 'increase' ? '📈' :
+                             insights.trends[0].type === 'decrease' ? '📉' : '➡️'}</span>
+                            <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                              insights.trends[0].type === 'increase' ? 'text-red-700 bg-red-200' :
+                              insights.trends[0].type === 'decrease' ? 'text-green-700 bg-green-200' :
+                              'text-slate-700 bg-slate-200'
+                            }`}>
+                              vs Anterior
+                            </span>
+                          </div>
+                          <p className={`text-2xl font-bold mb-1 ${
+                            insights.trends[0].type === 'increase' ? 'text-red-700' :
+                            insights.trends[0].type === 'decrease' ? 'text-green-700' :
+                            'text-slate-700'
+                          }`}>
+                            {insights.trends[0].value}
+                          </p>
+                          <p className={`text-xs ${
+                            insights.trends[0].type === 'increase' ? 'text-red-600' :
+                            insights.trends[0].type === 'decrease' ? 'text-green-600' :
+                            'text-slate-600'
+                          }`}>
+                            Comparação mensal
+                          </p>
+                        </div>
+                      )}
+
+                      {/* 3. Transações - VOLUME */}
+                      <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-2xl">📊</span>
+                          <span className="text-xs font-semibold text-blue-700 bg-blue-200 px-2 py-1 rounded-full">Total</span>
+                        </div>
+                        <p className="text-2xl font-bold text-blue-700 mb-1">{insights.totalTransactions || 0}</p>
+                        <p className="text-xs text-blue-600">Transações</p>
+                      </div>
+
+                      {/* 4. Média por Transação - MÉTRICA */}
+                      {insights.averagePerTransaction && (
+                        <div className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-2xl">📈</span>
+                            <span className="text-xs font-semibold text-green-700 bg-green-200 px-2 py-1 rounded-full">Média</span>
+                          </div>
+                          <p className="text-2xl font-bold text-green-700 mb-1">
+                            {new Intl.NumberFormat('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                              maximumFractionDigits: 0,
+                            }).format(insights.averagePerTransaction)}
+                          </p>
+                          <p className="text-xs text-green-600">Por transação</p>
+                        </div>
+                      )}
+
+                      {/* Quick Stats - Filtrados (sem duplicatas) */}
+                      {insights.quickStats && insights.quickStats
+                        .filter((stat: any) =>
+                          // Remover duplicata de "Média/Transação" (já temos averagePerTransaction)
+                          !stat.label.includes('Média/Transação') && !stat.label.includes('Média')
+                        )
+                        .map((stat: any, idx: number) => (
+                        <div key={idx} className={`bg-gradient-to-br border-2 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow ${
+                          stat.color === 'red' ? 'from-red-50 to-red-100 border-red-200' :
+                          stat.color === 'blue' ? 'from-blue-50 to-blue-100 border-blue-200' :
+                          stat.color === 'purple' ? 'from-purple-50 to-purple-100 border-purple-200' :
+                          stat.color === 'green' ? 'from-green-50 to-green-100 border-green-200' :
+                          stat.color === 'orange' ? 'from-orange-50 to-orange-100 border-orange-200' :
+                          'from-slate-50 to-slate-100 border-slate-200'
+                        }`}>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-2xl">{stat.icon}</span>
+                            <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                              stat.color === 'red' ? 'text-red-700 bg-red-200' :
+                              stat.color === 'blue' ? 'text-blue-700 bg-blue-200' :
+                              stat.color === 'purple' ? 'text-purple-700 bg-purple-200' :
+                              stat.color === 'green' ? 'text-green-700 bg-green-200' :
+                              stat.color === 'orange' ? 'text-orange-700 bg-orange-200' :
+                              'text-slate-700 bg-slate-200'
+                            }`}>
+                              {stat.label}
+                            </span>
+                          </div>
+                          <p className={`text-2xl font-bold mb-1 ${
+                            stat.color === 'red' ? 'text-red-700' :
+                            stat.color === 'blue' ? 'text-blue-700' :
+                            stat.color === 'purple' ? 'text-purple-700' :
+                            stat.color === 'green' ? 'text-green-700' :
+                            stat.color === 'orange' ? 'text-orange-700' :
+                            'text-slate-700'
+                          }`}>
+                            {stat.value}
+                          </p>
+                          <p className={`text-xs ${
+                            stat.color === 'red' ? 'text-red-600' :
+                            stat.color === 'blue' ? 'text-blue-600' :
+                            stat.color === 'purple' ? 'text-purple-600' :
+                            stat.color === 'green' ? 'text-green-600' :
+                            stat.color === 'orange' ? 'text-orange-600' :
+                            'text-slate-600'
+                          }`}>
+                            {stat.label.includes('Maior') ? 'Gasto único' :
+                             stat.label.includes('Top') ? 'Categoria' :
+                             stat.label.includes('Transações') ? 'Por dia' :
+                             stat.label.includes('Dia') ? 'Dia mais caro' : ''}
+                          </p>
+                        </div>
+                      ))}
+
+                      {/* 5. Dia Mais Caro - DETALHE (se não vier em quickStats) */}
+                      {insights.mostExpensiveDay && !insights.quickStats?.some((s: any) => s.label.includes('Dia')) && (
+                        <div className="bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-200 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-2xl">📅</span>
+                            <span className="text-xs font-semibold text-orange-700 bg-orange-200 px-2 py-1 rounded-full">Top</span>
+                          </div>
+                          <p className="text-xl font-bold text-orange-700 mb-1 truncate">{insights.mostExpensiveDay}</p>
+                          <p className="text-xs text-orange-600">Dia mais caro</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Top 3 Gastos e Categorias - Lado a Lado */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Top 3 Gastos - Melhorado */}
+                      {insights.topExpenses && insights.topExpenses.length > 0 && (
+                        <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-xl p-4 border-2 border-red-200 shadow-sm">
+                          <div className="flex items-center gap-2 mb-4">
+                            <span className="text-xl">🔥</span>
+                            <h3 className="text-base font-bold text-red-800">Maiores Gastos</h3>
+                          </div>
+                          <div className="space-y-3">
+                            {insights.topExpenses.slice(0, 3).map((expense: any, idx: number) => {
+                              const medals = ['🥇', '🥈', '🥉'];
+                              return (
+                                <div key={idx} className="bg-white rounded-lg p-3 shadow-sm border border-red-100 hover:shadow-md transition-shadow">
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-2xl">{medals[idx]}</span>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-semibold text-slate-900 truncate">{expense.description}</p>
+                                      <p className="text-xs text-slate-600">#{idx + 1} maior gasto</p>
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="text-lg font-bold text-red-600">
+                                        {new Intl.NumberFormat('pt-BR', {
+                                          style: 'currency',
+                                          currency: 'BRL',
+                                          maximumFractionDigits: 0,
+                                        }).format(expense.amount)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Categorias - Melhoradas */}
+                      {insights.categories && insights.categories.length > 0 && (
+                        <div className="bg-white rounded-xl p-4 border-2 border-slate-200 shadow-sm">
+                          <div className="flex items-center gap-2 mb-4">
+                            <span className="text-xl">📁</span>
+                            <h3 className="text-base font-bold text-slate-800">Gastos por Categoria</h3>
+                          </div>
+                          <div className="space-y-3">
+                            {insights.categories.slice(0, 5).map((cat: any, idx: number) => {
+                              const colors = [
+                                'from-blue-500 to-blue-600',
+                                'from-purple-500 to-purple-600',
+                                'from-pink-500 to-pink-600',
+                                'from-orange-500 to-orange-600',
+                                'from-green-500 to-green-600'
+                              ];
+                              return (
+                                <div key={idx} className="bg-slate-50 rounded-lg p-3 hover:bg-slate-100 transition-colors">
+                                  <div className="flex justify-between items-center mb-2">
+                                    <span className="text-sm font-semibold text-slate-800">{cat.categoryName}</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs font-medium text-slate-600">
+                                        {new Intl.NumberFormat('pt-BR', {
+                                          style: 'currency',
+                                          currency: 'BRL',
+                                          maximumFractionDigits: 0,
+                                        }).format(cat.total)}
+                                      </span>
+                                      <span className="text-sm font-bold text-slate-900 bg-slate-200 px-2 py-0.5 rounded-full">
+                                        {cat.percentage.toFixed(0)}%
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden mb-2">
+                                    <div
+                                      className={`bg-gradient-to-r ${colors[idx % colors.length]} h-2.5 rounded-full transition-all duration-500 shadow-sm`}
+                                      style={{ width: `${Math.min(cat.percentage, 100)}%` }}
+                                    ></div>
+                                  </div>
+                                  {cat.highestExpense && (
+                                    <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-200">
+                                      <span className="text-slate-600 flex items-center gap-1">
+                                        <span className="text-sm">⬆️</span>
+                                        Maior gasto:
+                                      </span>
+                                      <span className="font-bold text-slate-700">
+                                        {new Intl.NumberFormat('pt-BR', {
+                                          style: 'currency',
+                                          currency: 'BRL',
+                                          maximumFractionDigits: 0,
+                                        }).format(cat.highestExpense)}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Alertas IA */}
+                    {insights.aiInsights?.warnings && insights.aiInsights.warnings.length > 0 && (
+                      <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl p-4 border-2 border-yellow-300 shadow-sm">
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="text-xl">⚠️</span>
+                          <h3 className="text-base font-bold text-orange-800">Pontos de Atenção</h3>
+                        </div>
+                        <div className="space-y-2">
+                          {insights.aiInsights.warnings.slice(0, 3).map((warning: string, idx: number) => (
+                            <div key={idx} className="bg-white/70 rounded-lg p-3 border border-orange-200">
+                              <p className="text-sm text-slate-700 flex items-start gap-2">
+                                <span className="text-orange-600 font-bold text-lg leading-none">!</span>
+                                <span className="flex-1">{warning}</span>
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Padrões de Gastos Detectados */}
+                    {insights.aiInsights?.patterns && insights.aiInsights.patterns.length > 0 && (
+                      <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-6 border-2 border-purple-200 shadow-sm">
+                        <div className="flex items-center gap-2 mb-4">
+                          <span className="text-2xl">🔍</span>
+                          <h3 className="text-lg font-bold text-purple-800">Padrões Identificados</h3>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {insights.aiInsights.patterns.map((pattern: any, idx: number) => (
+                            <div
+                              key={idx}
+                              className="bg-white rounded-lg p-4 border border-purple-200 hover:border-purple-300 transition-colors"
+                            >
+                              <div className="flex items-start gap-3">
+                                <span className="text-2xl">{pattern.icon}</span>
+                                <div className="flex-1">
+                                  <p className="text-sm font-semibold text-slate-800 mb-1">
+                                    {pattern.description}
+                                  </p>
+                                  <p className="text-xs text-slate-600">{pattern.insight}</p>
+                                  <span className={`inline-block mt-2 px-2 py-1 rounded-full text-xs font-semibold ${
+                                    pattern.type === 'anomaly' ? 'bg-red-100 text-red-700' :
+                                    pattern.type === 'trend' ? 'bg-blue-100 text-blue-700' :
+                                    pattern.type === 'temporal' ? 'bg-green-100 text-green-700' :
+                                    'bg-purple-100 text-purple-700'
+                                  }`}>
+                                    {pattern.type}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 gap-4">
+                    <span className="text-6xl">📊</span>
+                    <p className="text-slate-600 font-medium">Nenhuma análise disponível</p>
+                    <button
+                      onClick={loadInsights}
+                      className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all shadow-md"
+                    >
+                      Gerar Análise
+                    </button>
                   </div>
                 )}
-
-                  {/* Dia Mais Caro */}
-                  {insights.mostExpensiveDay && (
-                    <div className="bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-200 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-2xl">📅</span>
-                        <span className="text-xs font-semibold text-orange-700 bg-orange-200 px-2 py-1 rounded-full">Top</span>
-                      </div>
-                      <p className="text-xl font-bold text-orange-700 mb-1 truncate">{insights.mostExpensiveDay}</p>
-                      <p className="text-xs text-orange-600">Dia mais caro</p>
-                    </div>
-                  )}
-
-                  {/* Tendência vs Mês Anterior */}
-                  {insights.trends && insights.trends.length > 0 && (
-                    <div className={`bg-gradient-to-br border-2 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow ${
-                      insights.trends[0].type === 'increase' ? 'from-red-50 to-red-100 border-red-200' :
-                      insights.trends[0].type === 'decrease' ? 'from-green-50 to-green-100 border-green-200' :
-                      'from-slate-50 to-slate-100 border-slate-200'
-                    }`}>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-2xl">{insights.trends[0].type === 'increase' ? '📈' :
-                         insights.trends[0].type === 'decrease' ? '📉' : '➡️'}</span>
-                        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                          insights.trends[0].type === 'increase' ? 'text-red-700 bg-red-200' :
-                          insights.trends[0].type === 'decrease' ? 'text-green-700 bg-green-200' :
-                          'text-slate-700 bg-slate-200'
-                        }`}>
-                          vs Anterior
-                        </span>
-                      </div>
-                      <p className={`text-2xl font-bold mb-1 ${
-                        insights.trends[0].type === 'increase' ? 'text-red-700' :
-                        insights.trends[0].type === 'decrease' ? 'text-green-700' :
-                        'text-slate-700'
-                      }`}>
-                        {insights.trends[0].value}
-                      </p>
-                      <p className={`text-xs ${
-                        insights.trends[0].type === 'increase' ? 'text-red-600' :
-                        insights.trends[0].type === 'decrease' ? 'text-green-600' :
-                        'text-slate-600'
-                      }`}>
-                        Comparação mensal
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Quick Stats integrados */}
-                  {insights.quickStats && insights.quickStats.map((stat: any, idx: number) => (
-                    <div key={idx} className={`bg-gradient-to-br border-2 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow ${
-                      stat.color === 'red' ? 'from-red-50 to-red-100 border-red-200' :
-                      stat.color === 'blue' ? 'from-blue-50 to-blue-100 border-blue-200' :
-                      stat.color === 'purple' ? 'from-purple-50 to-purple-100 border-purple-200' :
-                      stat.color === 'green' ? 'from-green-50 to-green-100 border-green-200' :
-                      'from-slate-50 to-slate-100 border-slate-200'
-                    }`}>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-2xl">{stat.icon}</span>
-                        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                          stat.color === 'red' ? 'text-red-700 bg-red-200' :
-                          stat.color === 'blue' ? 'text-blue-700 bg-blue-200' :
-                          stat.color === 'purple' ? 'text-purple-700 bg-purple-200' :
-                          stat.color === 'green' ? 'text-green-700 bg-green-200' :
-                          'text-slate-700 bg-slate-200'
-                        }`}>
-                          {stat.label}
-                        </span>
-                      </div>
-                      <p className={`text-2xl font-bold mb-1 ${
-                        stat.color === 'red' ? 'text-red-700' :
-                        stat.color === 'blue' ? 'text-blue-700' :
-                        stat.color === 'purple' ? 'text-purple-700' :
-                        stat.color === 'green' ? 'text-green-700' :
-                        'text-slate-700'
-                      }`}>
-                        {stat.value}
-                      </p>
-                      <p className={`text-xs ${
-                        stat.color === 'red' ? 'text-red-600' :
-                        stat.color === 'blue' ? 'text-blue-600' :
-                        stat.color === 'purple' ? 'text-purple-600' :
-                        stat.color === 'green' ? 'text-green-600' :
-                        'text-slate-600'
-                      }`}>
-                        {stat.label.includes('Média') ? 'Por transação' :
-                         stat.label.includes('Maior') ? 'Gasto único' :
-                         stat.label.includes('Top') ? 'Categoria' :
-                         stat.label.includes('Transações') ? 'Por dia' : ''}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-            </>
-          ) : null}
-
-          {/* Top 3 Gastos e Categorias - Lado a Lado */}
-          <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Top 3 Gastos - Melhorado */}
-            {insights?.topExpenses && insights.topExpenses.length > 0 && (
-              <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-xl p-4 border-2 border-red-200 shadow-sm">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="text-xl">🔥</span>
-                  <h3 className="text-base font-bold text-red-800">Maiores Gastos</h3>
-                </div>
-                <div className="space-y-3">
-                  {insights.topExpenses.slice(0, 3).map((expense: any, idx: number) => {
-                    const medals = ['🥇', '🥈', '🥉'];
-                    return (
-                      <div key={idx} className="bg-white rounded-lg p-3 shadow-sm border border-red-100 hover:shadow-md transition-shadow">
-                        <div className="flex items-center gap-3">
-                          <span className="text-2xl">{medals[idx]}</span>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-slate-900 truncate">{expense.description}</p>
-                            <p className="text-xs text-slate-600">#{idx + 1} maior gasto</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-lg font-bold text-red-600">
-                              {new Intl.NumberFormat('pt-BR', {
-                                style: 'currency',
-                                currency: 'BRL',
-                                maximumFractionDigits: 0,
-                              }).format(expense.amount)}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Categorias - Melhoradas */}
-            {insights?.categories && insights.categories.length > 0 && (
-              <div className="bg-white rounded-xl p-4 border-2 border-slate-200 shadow-sm">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="text-xl">📁</span>
-                  <h3 className="text-base font-bold text-slate-800">Gastos por Categoria</h3>
-                </div>
-                <div className="space-y-3">
-                  {insights.categories.slice(0, 5).map((cat: any, idx: number) => {
-                    const colors = [
-                      'from-blue-500 to-blue-600',
-                      'from-purple-500 to-purple-600',
-                      'from-pink-500 to-pink-600',
-                      'from-orange-500 to-orange-600',
-                      'from-green-500 to-green-600'
-                    ];
-                    return (
-                      <div key={idx} className="bg-slate-50 rounded-lg p-3 hover:bg-slate-100 transition-colors">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-sm font-semibold text-slate-800">{cat.categoryName}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium text-slate-600">
-                              {new Intl.NumberFormat('pt-BR', {
-                                style: 'currency',
-                                currency: 'BRL',
-                                maximumFractionDigits: 0,
-                              }).format(cat.total)}
-                            </span>
-                            <span className="text-sm font-bold text-slate-900 bg-slate-200 px-2 py-0.5 rounded-full">
-                              {cat.percentage.toFixed(0)}%
-                            </span>
-                          </div>
-                        </div>
-                        <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden mb-2">
-                          <div
-                            className={`bg-gradient-to-r ${colors[idx % colors.length]} h-2.5 rounded-full transition-all duration-500 shadow-sm`}
-                            style={{ width: `${Math.min(cat.percentage, 100)}%` }}
-                          ></div>
-                        </div>
-                        {cat.highestExpense && (
-                          <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-200">
-                            <span className="text-slate-600 flex items-center gap-1">
-                              <span className="text-sm">⬆️</span>
-                              Maior gasto:
-                            </span>
-                            <span className="font-bold text-slate-700">
-                              {new Intl.NumberFormat('pt-BR', {
-                                style: 'currency',
-                                currency: 'BRL',
-                                maximumFractionDigits: 0,
-                              }).format(cat.highestExpense)}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Alertas IA */}
-          {insights?.aiInsights?.warnings && insights.aiInsights.warnings.length > 0 && (
-            <div className="mt-6 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl p-4 border-2 border-yellow-300 shadow-sm">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-xl">⚠️</span>
-                <h3 className="text-base font-bold text-orange-800">Pontos de Atenção</h3>
-              </div>
-              <div className="space-y-2">
-                {insights.aiInsights.warnings.slice(0, 3).map((warning: string, idx: number) => (
-                  <div key={idx} className="bg-white/70 rounded-lg p-3 border border-orange-200">
-                    <p className="text-sm text-slate-700 flex items-start gap-2">
-                      <span className="text-orange-600 font-bold text-lg leading-none">!</span>
-                      <span className="flex-1">{warning}</span>
-                    </p>
-                  </div>
-                ))}
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        </>
       )}
 
       {/* Seção de Transações Salvas */}

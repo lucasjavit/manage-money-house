@@ -1,5 +1,6 @@
 package com.managehouse.money.service;
 
+import com.managehouse.money.dto.AIMonthlyAnalysisResponse;
 import com.managehouse.money.dto.ExpenseAlertsResponse;
 import com.managehouse.money.entity.Expense;
 import com.managehouse.money.repository.ExpenseRepository;
@@ -19,6 +20,7 @@ import java.util.stream.Collectors;
 public class ExpenseAlertsService {
 
     private final ExpenseRepository expenseRepository;
+    private final AIInsightsService aiInsightsService;
 
     // Limites para alertas
     private static final double WARNING_THRESHOLD = 20.0; // 20% acima da média
@@ -90,6 +92,24 @@ public class ExpenseAlertsService {
             }
         }
 
+        // Gerar sugestões personalizadas com IA para alertas críticos e warnings
+        for (ExpenseAlertsResponse.Alert alert : alerts) {
+            if ("critical".equals(alert.getSeverity()) || "warning".equals(alert.getSeverity())) {
+                try {
+                    String aiSuggestion = aiInsightsService.generateAlertSuggestion(
+                            alert.getExpenseTypeName(),
+                            alert.getCurrentValue(),
+                            alert.getAverageValue(),
+                            alert.getPercentageAboveAverage()
+                    );
+                    alert.setSuggestion(aiSuggestion);
+                } catch (Exception e) {
+                    log.warn("Erro ao gerar sugestão AI para {}: {}", alert.getExpenseTypeName(), e.getMessage());
+                    // Mantém a sugestão padrão que já foi definida
+                }
+            }
+        }
+
         // Ordenar alertas por severidade (crítico primeiro)
         alerts.sort((a, b) -> {
             int severityCompare = getSeverityOrder(b.getSeverity()) - getSeverityOrder(a.getSeverity());
@@ -100,7 +120,15 @@ public class ExpenseAlertsService {
         // Criar sumário
         ExpenseAlertsResponse.Summary summary = createSummary(alerts, totalCurrentMonth, averageMonthSpent);
 
-        return new ExpenseAlertsResponse(month, year, alerts, summary);
+        // Gerar análise mensal completa com IA
+        AIMonthlyAnalysisResponse aiAnalysis = null;
+        try {
+            aiAnalysis = aiInsightsService.generateMonthlyAnalysis(userId, month, year);
+        } catch (Exception e) {
+            log.warn("Erro ao gerar análise AI mensal: {}", e.getMessage());
+        }
+
+        return new ExpenseAlertsResponse(month, year, alerts, summary, aiAnalysis);
     }
 
     private List<Expense> getHistoricalExpenses(Long userId, Integer currentMonth, Integer currentYear, int monthsBack) {
@@ -262,7 +290,8 @@ public class ExpenseAlertsService {
                 month,
                 year,
                 Collections.emptyList(),
-                new ExpenseAlertsResponse.Summary(0, 0, 0, BigDecimal.ZERO, BigDecimal.ZERO, "good")
+                new ExpenseAlertsResponse.Summary(0, 0, 0, BigDecimal.ZERO, BigDecimal.ZERO, "good"),
+                null // No AI analysis for empty response
         );
     }
 }

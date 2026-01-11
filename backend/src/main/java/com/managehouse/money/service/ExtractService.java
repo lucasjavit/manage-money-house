@@ -528,14 +528,23 @@ public class ExtractService {
                     
                     // Se ainda não tem tipo, usar "Outros" como padrão
                     if (transaction.getExpenseTypeId() == null) {
-                        Optional<ExtractExpenseType> outrosType = expenseTypes.stream()
+                        ExtractExpenseType outrosType = expenseTypes.stream()
                             .filter(et -> et.getName().equalsIgnoreCase("Outros"))
-                            .findFirst();
-                        if (outrosType.isPresent()) {
-                            transaction.setExpenseTypeId(outrosType.get().getId());
-                            transaction.setExpenseTypeName(outrosType.get().getName());
-                            log.info("Tipo não fornecido pela IA, usando 'Outros' para: " + transaction.getDescription());
-                        }
+                            .findFirst()
+                            .orElseGet(() -> {
+                                // Se "Outros" não existe, criar IMEDIATAMENTE
+                                log.warn("Tipo 'Outros' não encontrado! Criando...");
+                                ExtractExpenseType newOutros = new ExtractExpenseType();
+                                newOutros.setName("Outros");
+                                ExtractExpenseType saved = extractExpenseTypeRepository.save(newOutros);
+                                // Adicionar à lista para evitar criar múltiplas vezes
+                                expenseTypes.add(saved);
+                                return saved;
+                            });
+
+                        transaction.setExpenseTypeId(outrosType.getId());
+                        transaction.setExpenseTypeName(outrosType.getName());
+                        log.info("Transação sem categoria definida, usando 'Outros': {}", transaction.getDescription());
                     }
                     
                     // Validar antes de adicionar
@@ -627,8 +636,9 @@ public class ExtractService {
                     break;
                 case "vestuário":
                 case "vestuario":
-                    if (containsAny(descLower, "roupa", "vestuario", "vestuário", "moda", "loja", "shopping", "calcado", "calçado", "sapato", "sapataria", 
-                            "camiseta", "calca", "calça", "zara", "renner", "riachuelo", "c&a", "c e a")) {
+                    if (containsAny(descLower, "roupa", "vestuario", "vestuário", "moda", "loja", "shopping", "calcado", "calçado", "sapato", "sapataria",
+                            "camiseta", "calca", "calça", "zara", "renner", "riachuelo", "c&a", "c e a",
+                            "centauro", "decathlon", "netshoes", "kanui", "fut fanatics", "esporte", "nike", "adidas", "puma")) {
                         return type.getId();
                     }
                     break;
@@ -704,9 +714,7 @@ public class ExtractService {
         if (transaction.getDate() == null) {
             return false;
         }
-        if (transaction.getExpenseTypeId() == null) {
-            return false;
-        }
+        // Não validar expenseTypeId aqui - o fallback "Outros" já garante que será preenchido
         // Validar se a data não é muito antiga ou futura (ex: entre 2020 e 2030)
         int year = transaction.getDate().getYear();
         if (year < 2020 || year > 2030) {

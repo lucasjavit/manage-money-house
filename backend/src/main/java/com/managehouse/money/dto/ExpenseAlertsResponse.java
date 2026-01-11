@@ -15,6 +15,7 @@ public class ExpenseAlertsResponse {
     private Integer year;
     private List<Alert> alerts;
     private Summary summary;
+    private AIMonthlyAnalysisResponse aiAnalysis; // Análise AI completa do mês
 
     @Data
     @NoArgsConstructor

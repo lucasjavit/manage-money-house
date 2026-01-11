@@ -270,6 +270,7 @@ export interface ExpenseAlertsResponse {
   year: number;
   alerts: ExpenseAlert[];
   summary: AlertsSummary;
+  aiAnalysis?: AIMonthlyAnalysis; // Análise AI completa do mês
 }
 
 export interface ExpenseAlert {
@@ -291,4 +292,34 @@ export interface AlertsSummary {
   totalMonthSpent: number;
   averageMonthSpent: number;
   overallStatus: 'good' | 'attention' | 'critical';
+}
+
+// AI Monthly Analysis Types
+export interface AIMonthlyAnalysis {
+  executiveSummary: string;
+  financialHealthScore: number; // 0-100
+  patternsDetected: Pattern[];
+  recommendations: string[];
+  nextMonthPrediction: Prediction;
+  comparison: Comparison;
+}
+
+export interface Pattern {
+  type: 'temporal' | 'category' | 'trend' | 'anomaly';
+  description: string;
+  insight: string;
+  icon: string;
+}
+
+export interface Prediction {
+  predictedAmount: number;
+  confidence: number; // 0-1
+  reasoning: string;
+  assumptions: string[];
+}
+
+export interface Comparison {
+  vsLastMonth: string;
+  vsAverage: string;
+  trend: 'increasing' | 'decreasing' | 'stable';
 }
