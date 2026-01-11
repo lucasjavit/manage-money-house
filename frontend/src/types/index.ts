@@ -250,6 +250,11 @@ export interface AIInsights {
   suggestions?: string[];
   warnings?: string[];
   analysis?: string;
+  patterns?: Array<{
+    description: string;
+    type: string;
+    impact: string;
+  }>;
 }
 
 export interface Trend {

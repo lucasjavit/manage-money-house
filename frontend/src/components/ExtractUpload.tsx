@@ -944,8 +944,8 @@ const ExtractUpload = () => {
                       </div>
                     )}
 
-                    {/* Padrões de Gastos Detectados */}
-                    {insights.aiInsights?.patterns && insights.aiInsights.patterns.length > 0 && (
+                    {/* Padrões de Gastos Detectados - Removido temporariamente até backend implementar */}
+                    {/* {insights.aiInsights?.patterns && insights.aiInsights.patterns.length > 0 && (
                       <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-6 border-2 border-purple-200 shadow-sm">
                         <div className="flex items-center gap-2 mb-4">
                           <span className="text-2xl">🔍</span>
@@ -978,7 +978,7 @@ const ExtractUpload = () => {
                           ))}
                         </div>
                       </div>
-                    )}
+                    )} */}
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-12 gap-4">
