@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { marketService } from '../services/marketService';
 import { portfolioReviewService } from '../services/portfolioReviewService';
 import { realPortfolioService } from '../services/realPortfolioService';
@@ -45,14 +46,21 @@ const InvestmentPage = () => {
   const [realPortfolio, setRealPortfolio] = useState<RealPortfolioSummary | null>(null);
   const [realPortfolioLoaded, setRealPortfolioLoaded] = useState(false);
 
-  // Simulated user ID (in a real app, this would come from auth)
-  const currentUserId = 1;
+  // Obter userId do usuario autenticado
+  const { user } = useAuth();
+  const currentUserId = user?.id ?? 1;
 
   // Carregar dados de índices e status do review ao montar o componente
   useEffect(() => {
     loadMarketData();
     loadReviewStatus();
   }, []);
+
+  // Resetar carteira real quando usuario mudar
+  useEffect(() => {
+    setRealPortfolio(null);
+    setRealPortfolioLoaded(false);
+  }, [currentUserId]);
 
   // Carregar dados da carteira quando a aba é selecionada
   useEffect(() => {
@@ -67,7 +75,7 @@ const InvestmentPage = () => {
     if (activeTab === 'minha-carteira' && !realPortfolioLoaded) {
       loadRealPortfolio();
     }
-  }, [activeTab]);
+  }, [activeTab, currentUserId, realPortfolioLoaded]);
 
   const loadMarketData = async () => {
     try {
