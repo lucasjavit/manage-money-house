@@ -609,78 +609,91 @@ public class RealPortfolioService {
                 .multiply(new BigDecimal("100"));
 
         return """
-            Voce e um analista de investimentos certificado (CNPI) brasileiro.
+            Voce e um analista de investimentos CNPI brasileiro. Siga ESTRITAMENTE as regras abaixo.
 
-            Analise o ativo abaixo e forneca uma recomendacao seguindo as melhores praticas do mercado:
-
-            ATIVO:
+            ATIVO A ANALISAR:
             - Ticker: %s
             - Nome: %s
             - Tipo: %s
             - Subtipo: %s
-            - Quantidade: %s
             - Preco Atual: R$ %s
             - Valor Total: R$ %s
             - Percentual na Carteira: %.2f%%
             - Vencimento: %s
 
             CONTEXTO DA CARTEIRA:
-            - Total da Carteira: R$ %s
-            - Total em Acoes: R$ %s
-            - Total em FIIs: R$ %s
-            - Total em Renda Fixa: R$ %s
+            - Total: R$ %s | Acoes: R$ %s | FIIs: R$ %s | Renda Fixa: R$ %s
 
-            CRITERIOS DE ANALISE:
-            1. Concentracao: Se ativo > 10%% da carteira, considerar risco de concentracao
-            2. Diversificacao: Avaliar se ha exposicao excessiva a um setor
-            3. Fundamentos: Considerar P/L, P/VP, ROE, Dividend Yield do ativo
-            4. Momento: Tendencia recente do ativo (alta/baixa/lateral)
-            5. Riscos: Governanca, liquidez, regulatorio, cambial
+            ============================================================
+            REGRAS OBRIGATORIAS - SIGA EXATAMENTE (NAO INTERPRETE):
+            ============================================================
 
-            Para ACOES, considerar:
-            - Se P/L > 15 e empresa nao e growth, pode estar caro
-            - Se Dividend Yield < 3%% e empresa e madura, pode nao ser atrativa
-            - Concentracao setorial (ex: muito exposto a commodities)
-            - Considere o historico recente e perspectivas do setor
+            1. CONCENTRACAO (regra fixa):
+               - Se percentual > 20%% da carteira → recommendation = "VENDER"
+               - Se percentual entre 10-20%% → mencionar risco na analysis, mas pode ser "MANTER"
+               - Se percentual < 10%% → OK, nao penalizar
 
-            Para FIIs, considerar:
-            - Se P/VP > 1.1, pode estar caro
-            - Se Dividend Yield < 8%% aa, pode haver opcoes melhores
-            - Vacancia e qualidade dos imoveis
-            - Tipo de FII (papel, tijolo, hibrido)
+            2. PARA ACOES - Calcular preco teto (ceilingPrice):
+               Use P/L justo FIXO por setor:
+               - Bancos (BBAS3, ITUB4, BBDC4, SANB11): P/L = 8x → ceilingPrice = precoAtual * 1.15
+               - Utilities/Energia (TAEE11, EGIE3, CPFE3, CMIG4): P/L = 12x → ceilingPrice = precoAtual * 1.20
+               - Commodities (VALE3, PETR4, CSAN3): P/L = 6x → ceilingPrice = precoAtual * 1.10
+               - Varejo/Consumo (MGLU3, LREN3, PCAR3): P/L = 15x → ceilingPrice = precoAtual * 1.25
+               - Outros: P/L = 10x → ceilingPrice = precoAtual * 1.18
 
-            Para RENDA FIXA (CDB, LCA, LCI, DEBENTURE), considerar:
-            - Risco de credito do emissor
-            - Prazo ate vencimento vs taxa oferecida
-            - ALERTAR FORTEMENTE se for de banco em liquidacao (Banco Master, BRK Financeira, etc)
-            - FGC cobre ate R$ 250.000 por CPF/instituicao
+            3. PARA FIIs - Calcular preco teto:
+               - P/VP justo = 1.0 (SEMPRE)
+               - ceilingPrice = precoAtual * 1.05 (margem de 5%%)
+               - FIIs de papel (RECR11, KNSC11, MXRF11): riskLevel = "BAIXO"
+               - FIIs de tijolo: riskLevel = "MEDIO"
 
-            IMPORTANTE: Voce DEVE calcular e retornar o preco teto (ceilingPrice) e vies (bias) para ACOES e FIIs.
-            Para renda fixa, use null no ceilingPrice e "NEUTRO" no bias.
+            4. PARA RENDA FIXA (CDB, LCA, LCI, DEBENTURE):
+               - Se nome contem "Master", "BRK", "Portocred", "Open", "Digimais" → recommendation = "VENDER", riskLevel = "ALTO"
+               - Se vencimento < 6 meses → riskLevel = "BAIXO", recommendation = "MANTER"
+               - Se vencimento entre 6 meses e 2 anos → riskLevel = "BAIXO", recommendation = "MANTER"
+               - Se vencimento > 2 anos → riskLevel = "MEDIO", recommendation = "MANTER"
+               - ceilingPrice = null (SEMPRE para renda fixa)
+               - bias = "NEUTRO" (SEMPRE para renda fixa)
+
+            5. BIAS (obrigatorio, siga a formula):
+               - "COMPRA" se tipo = ACAO ou FII e ativo tem bons fundamentos conhecidos
+               - "VENDA" se recomendacao = "VENDER"
+               - "NEUTRO" para renda fixa OU se nao ha dados suficientes
+
+            6. CONFIDENCE SCORE (valores fixos):
+               - 0.85 se acao/FII com ticker conhecido (BBAS3, VALE3, RECR11, etc)
+               - 0.70 se acao/FII com ticker desconhecido
+               - 0.90 para renda fixa de banco grande (Itau, BB, Bradesco, BTG)
+               - 0.60 para renda fixa de banco pequeno
+               - 0.30 para renda fixa de banco em liquidacao
+
+            7. RECOMENDACAO PADRAO:
+               - Se nenhuma regra de VENDER se aplica → recommendation = "MANTER"
+               - Use "COMPRAR_MAIS" apenas se preco atual < ceilingPrice * 0.85 (15%% abaixo do teto)
+
+            ============================================================
 
             Responda APENAS em JSON valido (sem markdown, sem ```):
             {
               "recommendation": "MANTER",
-              "analysis": "Explicacao em 2-3 frases sobre o motivo da recomendacao...",
-              "mainReason": "Frase curta principal (max 50 caracteres)",
+              "analysis": "Justificativa em 2 frases baseada nas regras acima",
+              "mainReason": "Frase curta (max 50 chars)",
               "riskLevel": "BAIXO",
               "confidenceScore": 0.85,
               "ceilingPrice": 25.50,
               "bias": "COMPRA"
             }
 
-            TODOS os campos sao OBRIGATORIOS. Valores possiveis:
-            - recommendation: "MANTER", "VENDER" ou "COMPRAR_MAIS"
-            - riskLevel: "BAIXO", "MEDIO" ou "ALTO"
-            - confidenceScore: numero entre 0.0 e 1.0
-            - ceilingPrice: preco teto em reais (numero decimal). Para ACOES e FIIs, calcule com base em multiplos justos (P/L justo de 10-12x para bancos, 15x para utilities, P/VP justo de 1.0 para FIIs). Para renda fixa, use null.
-            - bias: OBRIGATORIO. "COMPRA" (preco atual abaixo do teto, bom momento), "VENDA" (preco acima do teto ou fundamentos deteriorando), ou "NEUTRO" (aguardar melhor ponto de entrada ou renda fixa)
+            Valores permitidos:
+            - recommendation: "MANTER", "VENDER", "COMPRAR_MAIS"
+            - riskLevel: "BAIXO", "MEDIO", "ALTO"
+            - bias: "COMPRA", "VENDA", "NEUTRO"
+            - ceilingPrice: numero decimal ou null
             """.formatted(
                 position.getTicker(),
                 position.getName(),
                 position.getAssetType(),
                 position.getAssetSubtype() != null ? position.getAssetSubtype() : "N/A",
-                position.getQuantity(),
                 position.getClosePrice(),
                 position.getTotalValue(),
                 percentOfPortfolio,
