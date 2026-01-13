@@ -395,3 +395,293 @@ export interface MonthlyIncomeData {
   expenses: number;         // Gastos totais
   savings: number;          // Poupança (income - expenses)
 }
+
+// Market Data Types
+export interface MarketIndexData {
+  symbol: string;
+  name: string;
+  value: number;
+  change: number;
+  trend: 'up' | 'down' | 'neutral';
+  lastUpdate: string;
+}
+
+export interface ForexData {
+  usd: MarketIndexData;
+  eur: MarketIndexData;
+  gbp: MarketIndexData;
+  jpy: MarketIndexData;
+}
+
+export interface BrazilianIndices {
+  ibovespa: MarketIndexData;
+  ifix: MarketIndexData;
+  idiv: MarketIndexData;
+}
+
+export interface USIndices {
+  sp500: MarketIndexData;
+  nasdaq: MarketIndexData;
+  dow: MarketIndexData;
+}
+
+export interface CryptoData {
+  bitcoin: MarketIndexData;
+  ethereum: MarketIndexData;
+  otherCoins: MarketIndexData[];
+}
+
+export interface MarketDataDashboard {
+  forex: ForexData;
+  brazilianIndices: BrazilianIndices;
+  usIndices: USIndices;
+  crypto: CryptoData;
+  lastUpdate: string;
+}
+
+export interface PortfolioAsset {
+  type: string;
+  percentage: number;
+  description: string;
+}
+
+export interface RecommendedAsset {
+  rank: number;
+  ticker: string;
+  name: string;
+  type: string;
+  expectedDY: number | null;
+  entryPrice: number | null;
+  currentPrice: number | null;
+  ceilingPrice: number | null;
+  targetAllocation: number;
+  bias: 'Comprar' | 'Aguardar' | '-';
+  rationale: string;
+}
+
+export interface InvestmentPortfolio {
+  name: string;
+  description: string;
+  strategy: string;
+  riskLevel: string;
+  suggestedComposition: PortfolioAsset[];
+  characteristics: string[];
+  recommendedAssets?: RecommendedAsset[];
+  icon: string;
+}
+
+// Asset Analysis Types (AI-powered)
+export interface AssetAnalysis {
+  ticker: string;
+  name: string;
+  type: string;
+  currentPrice: number | null;
+  ceilingPrice: number | null;
+  expectedDY: number | null;
+  bias: string;
+  rationale: string;
+  aiAnalysis: string;
+  investmentThesis: string;
+  risks: string[];
+  shortTermOutlook: string;
+  sectorComparison: string;
+  economicImpact: EconomicImpactAnalysis;
+}
+
+export interface EconomicImpactAnalysis {
+  selic: number | null;
+  selicImpact: string;
+  ipca: number | null;
+  ipcaImpact: string;
+}
+
+// Portfolio Review Types (AI-powered periodic analysis)
+export interface PortfolioAnalysis {
+  id: number;
+  portfolioName: string;
+  ticker: string;
+  assetName: string;
+  assetType: string;
+  currentPrice: number | null;
+  ceilingPrice: number | null;
+  recommendation: 'MANTER' | 'SUBSTITUIR' | 'OBSERVAR';
+  analysisText: string;
+  substitutionSuggestion: string | null;
+  confidenceScore: number;
+  analysisDate: string;
+  nextReviewDate: string;
+  isActive: boolean;
+}
+
+export interface PortfolioReviewStatus {
+  isRunning: boolean;
+  lastRunTime: string | null;
+  lastRunStatus: string;
+}
+
+export interface PortfolioReviewResult {
+  success: boolean;
+  message: string;
+  results: PortfolioAnalysis[];
+  substitutions?: number;
+  portfolioName?: string;
+}
+
+// Personalized Portfolio Types
+export type RiskProfile = 'CONSERVADOR' | 'MODERADO' | 'ARROJADO';
+
+export interface PersonalizedPortfolioRequest {
+  userId: number;
+  riskProfile: RiskProfile;
+}
+
+export interface RiskProfileOption {
+  id: RiskProfile;
+  name: string;
+  icon: string;
+  description: string;
+  allocation: string;
+  color: string;
+}
+
+// Real Portfolio Types (B3 Report Upload)
+export interface B3ReportUploadRequest {
+  userId: number;
+  fileName: string;
+  fileContent: string; // Base64 encoded PDF
+}
+
+export interface B3ReportUploadResponse {
+  reportMonth: number;
+  reportYear: number;
+  stocks: StockPosition[];
+  fiis: FiiPosition[];
+  fixedIncome: FixedIncomePosition[];
+  funds: FundPosition[];
+  dividends: DividendReceived[];
+  totals: PortfolioTotals;
+  aiAnalysis?: string;
+  errorMessage?: string;
+}
+
+export interface StockPosition {
+  ticker: string;
+  name: string;
+  type: string; // ON, PN, PNB
+  quantity: number;
+  closePrice: number;
+  totalValue: number;
+  institution: string;
+}
+
+export interface FiiPosition {
+  ticker: string;
+  name: string;
+  quantity: number;
+  closePrice: number;
+  totalValue: number;
+  institution: string;
+}
+
+export interface FixedIncomePosition {
+  product: string;
+  productType: string; // CDB, LCA, LCI, DEBENTURE
+  institution: string;
+  maturityDate: string;
+  quantity: number;
+  unitPrice: number;
+  totalValue: number;
+}
+
+export interface FundPosition {
+  ticker: string;
+  name: string;
+  fundType: string; // FIAGRO, FII, etc
+  quantity: number;
+  closePrice: number;
+  totalValue: number;
+  institution: string;
+}
+
+export interface DividendReceived {
+  ticker: string;
+  productName: string;
+  paymentDate: string;
+  eventType: string; // Dividendo, JCP, Rendimento
+  quantity: number;
+  unitPrice: number;
+  netValue: number;
+}
+
+export interface PortfolioTotals {
+  stocks: number;
+  fiis: number;
+  fixedIncome: number;
+  funds: number;
+  dividends: number;
+  grandTotal: number;
+}
+
+export interface HealthScoreDetails {
+  diversificationScore: number;     // Diversificacao entre classes (0-25)
+  concentrationScore: number;       // Risco de concentracao (0-25)
+  qualityScore: number;             // Qualidade dos ativos (0-25)
+  riskScore: number;                // Nivel de risco geral (0-25)
+  overallStatus: 'EXCELENTE' | 'BOM' | 'REGULAR' | 'RUIM' | 'CRITICO';
+  mainStrength: string;             // Ponto forte principal
+  mainWeakness: string;             // Ponto fraco principal
+  recommendations: string[];        // Recomendacoes de melhoria
+}
+
+export interface RealPortfolioSummary {
+  id: number;
+  userId: number;
+  reportMonth: number;
+  reportYear: number;
+  totalStocks: number;
+  totalFiis: number;
+  totalFixedIncome: number;
+  totalFunds: number;
+  totalDividends: number;
+  grandTotal: number;
+  aiAnalysis?: string;
+  uploadedAt: string;
+  analyzedAt?: string;
+  healthScore?: number;
+  healthScoreDetails?: HealthScoreDetails;
+  positions: RealPortfolioPosition[];
+  dividends: RealPortfolioDividend[];
+}
+
+export interface RealPortfolioPosition {
+  id: number;
+  ticker: string;
+  name: string;
+  assetType: string;
+  assetSubtype?: string;
+  institution?: string;
+  quantity: number;
+  closePrice: number;
+  totalValue: number;
+  maturityDate?: string;
+  // Campos de analise individual de IA
+  aiRecommendation?: 'MANTER' | 'VENDER' | 'COMPRAR_MAIS';
+  aiAnalysis?: string;
+  aiMainReason?: string;
+  aiRiskLevel?: 'BAIXO' | 'MEDIO' | 'ALTO';
+  aiConfidenceScore?: number;
+  aiCeilingPrice?: number;
+  aiBias?: 'COMPRA' | 'VENDA' | 'NEUTRO';
+  aiAnalyzedAt?: string;
+}
+
+export interface RealPortfolioDividend {
+  id: number;
+  ticker: string;
+  productName: string;
+  paymentDate: string;
+  eventType: string;
+  quantity: number;
+  unitPrice: number;
+  netValue: number;
+}

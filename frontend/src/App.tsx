@@ -6,6 +6,7 @@ import ExpenseSheet from './components/ExpenseSheet'
 import Settings from './components/Settings'
 import ExtractUpload from './components/ExtractUpload'
 import SalaryPage from './components/SalaryPage'
+import InvestmentPage from './components/InvestmentPage'
 import Sidebar from './components/Sidebar'
 import './App.css'
 
@@ -108,6 +109,7 @@ const AppContent = () => {
             <Route path="/settings" element={<Settings />} />
             <Route path="/extract" element={<ExtractUpload />} />
             <Route path="/salary" element={<SalaryPage />} />
+            <Route path="/investments" element={<InvestmentPage />} />
           </Routes>
         </main>
       </div>
