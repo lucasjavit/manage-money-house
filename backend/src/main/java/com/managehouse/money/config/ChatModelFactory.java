@@ -61,12 +61,12 @@ public class ChatModelFactory {
 
     /**
      * Cria uma instância de ChatLanguageModel otimizada para extracao de dados estruturados.
-     * Usa maxTokens alto (16000) e timeout maior (120s) para processar PDFs grandes.
+     * Usa maxTokens alto (16000) e timeout maior (180s) para processar PDFs/Excel grandes.
      *
      * @param apiKey A chave da API do OpenAI
      * @return ChatLanguageModel configurado para extracao, ou null se apiKey for inválida
      */
     public ChatLanguageModel createExtractionModel(String apiKey) {
-        return createChatModel(apiKey, 16000, 120);
+        return createChatModel(apiKey, 16000, 180);
     }
 }

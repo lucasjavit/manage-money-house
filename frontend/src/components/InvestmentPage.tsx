@@ -57,10 +57,26 @@ const InvestmentPage = () => {
     loadReviewStatus();
   }, []);
 
-  // Resetar carteira real quando usuario mudar
+  // Resetar e recarregar carteira real quando usuario mudar
   useEffect(() => {
     setRealPortfolio(null);
     setRealPortfolioLoaded(false);
+    // Se ja estiver na aba, recarregar imediatamente
+    if (activeTab === 'minha-carteira') {
+      const reloadPortfolio = async () => {
+        try {
+          setLoadingTab('minha-carteira');
+          const portfolio = await realPortfolioService.getLatestPortfolio(currentUserId);
+          setRealPortfolio(portfolio);
+          setRealPortfolioLoaded(true);
+        } catch (err) {
+          console.error('Error reloading real portfolio:', err);
+        } finally {
+          setLoadingTab(null);
+        }
+      };
+      reloadPortfolio();
+    }
   }, [currentUserId]);
 
   // Carregar dados da carteira quando a aba é selecionada

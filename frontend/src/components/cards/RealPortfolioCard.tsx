@@ -613,20 +613,27 @@ const RealPortfolioCard: React.FC<Props> = ({ portfolio, onNewUpload, onRefresh 
 
   // Agrupar posicoes por tipo
   const stocks = portfolio.positions.filter((p) => p.assetType === 'ACAO');
-  const fiis = portfolio.positions.filter((p) => p.assetType === 'FII');
+  const fiis = portfolio.positions.filter((p) =>
+    ['FII', 'FIAGRO'].includes(p.assetType)
+  );
   const fixedIncome = portfolio.positions.filter((p) =>
-    ['CDB', 'LCA', 'LCI', 'DEBENTURE', 'RENDA_FIXA'].includes(p.assetType)
+    ['CDB', 'LCA', 'LCI', 'DEBENTURE', 'RENDA_FIXA', 'TESOURO'].includes(p.assetType)
   );
-  const funds = portfolio.positions.filter((p) =>
-    ['FUNDO', 'FIAGRO'].includes(p.assetType)
-  );
+  const funds = portfolio.positions.filter((p) => p.assetType === 'FUNDO');
 
-  // Calcular percentuais para o grafico
-  const total = portfolio.grandTotal || 1;
-  const stocksPct = ((portfolio.totalStocks || 0) / total) * 100;
-  const fiisPct = ((portfolio.totalFiis || 0) / total) * 100;
-  const fixedIncomePct = ((portfolio.totalFixedIncome || 0) / total) * 100;
-  const fundsPct = ((portfolio.totalFunds || 0) / total) * 100;
+  // Calcular totais reais das posicoes (para consistencia com as abas)
+  const stocksTotal = stocks.reduce((sum, p) => sum + (p.totalValue || 0), 0);
+  const fiisTotal = fiis.reduce((sum, p) => sum + (p.totalValue || 0), 0);
+  const fixedIncomeTotal = fixedIncome.reduce((sum, p) => sum + (p.totalValue || 0), 0);
+  const fundsTotal = funds.reduce((sum, p) => sum + (p.totalValue || 0), 0);
+  const realGrandTotal = stocksTotal + fiisTotal + fixedIncomeTotal + fundsTotal;
+
+  // Calcular percentuais para o grafico (usando totais calculados)
+  const total = realGrandTotal || 1;
+  const stocksPct = (stocksTotal / total) * 100;
+  const fiisPct = (fiisTotal / total) * 100;
+  const fixedIncomePct = (fixedIncomeTotal / total) * 100;
+  const fundsPct = (fundsTotal / total) * 100;
 
   const toggleSection = (section: string) => {
     setExpandedSection(expandedSection === section ? null : section);
@@ -796,7 +803,7 @@ const RealPortfolioCard: React.FC<Props> = ({ portfolio, onNewUpload, onRefresh 
           </div>
         </div>
         <div className="text-4xl font-bold mt-4">
-          {formatCurrency(portfolio.grandTotal)}
+          {formatCurrency(realGrandTotal)}
         </div>
         <p className="text-purple-200 text-sm mt-1">
           Patrimonio total em investimentos
@@ -813,17 +820,17 @@ const RealPortfolioCard: React.FC<Props> = ({ portfolio, onNewUpload, onRefresh 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
           <div className="text-blue-600 text-sm font-medium">Acoes</div>
-          <div className="text-xl font-bold text-blue-800">{formatCurrency(portfolio.totalStocks)}</div>
+          <div className="text-xl font-bold text-blue-800">{formatCurrency(stocksTotal)}</div>
           <div className="text-blue-500 text-sm">{stocksPct.toFixed(1)}%</div>
         </div>
         <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
           <div className="text-purple-600 text-sm font-medium">FIIs</div>
-          <div className="text-xl font-bold text-purple-800">{formatCurrency(portfolio.totalFiis)}</div>
+          <div className="text-xl font-bold text-purple-800">{formatCurrency(fiisTotal)}</div>
           <div className="text-purple-500 text-sm">{fiisPct.toFixed(1)}%</div>
         </div>
         <div className="bg-amber-50 rounded-lg p-4 border border-amber-200">
           <div className="text-amber-600 text-sm font-medium">Renda Fixa</div>
-          <div className="text-xl font-bold text-amber-800">{formatCurrency(portfolio.totalFixedIncome)}</div>
+          <div className="text-xl font-bold text-amber-800">{formatCurrency(fixedIncomeTotal)}</div>
           <div className="text-amber-500 text-sm">{fixedIncomePct.toFixed(1)}%</div>
         </div>
         <div className="bg-green-50 rounded-lg p-4 border border-green-200">
@@ -840,7 +847,7 @@ const RealPortfolioCard: React.FC<Props> = ({ portfolio, onNewUpload, onRefresh 
           <div className="bg-blue-500" style={{ width: `${stocksPct}%` }} title={`Acoes: ${stocksPct.toFixed(1)}%`}></div>
           <div className="bg-purple-500" style={{ width: `${fiisPct}%` }} title={`FIIs: ${fiisPct.toFixed(1)}%`}></div>
           <div className="bg-amber-500" style={{ width: `${fixedIncomePct}%` }} title={`Renda Fixa: ${fixedIncomePct.toFixed(1)}%`}></div>
-          <div className="bg-teal-500" style={{ width: `${fundsPct}%` }} title={`Fundos: ${fundsPct.toFixed(1)}%`}></div>
+          {fundsPct > 0 && <div className="bg-teal-500" style={{ width: `${fundsPct}%` }} title={`Fundos: ${fundsPct.toFixed(1)}%`}></div>}
         </div>
         <div className="flex flex-wrap gap-4 mt-3 text-xs">
           <div className="flex items-center gap-1">
@@ -855,10 +862,12 @@ const RealPortfolioCard: React.FC<Props> = ({ portfolio, onNewUpload, onRefresh 
             <div className="w-3 h-3 rounded bg-amber-500"></div>
             <span>Renda Fixa ({fixedIncomePct.toFixed(1)}%)</span>
           </div>
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded bg-teal-500"></div>
-            <span>Fundos ({fundsPct.toFixed(1)}%)</span>
-          </div>
+          {fundsPct > 0 && (
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded bg-teal-500"></div>
+              <span>Fundos ({fundsPct.toFixed(1)}%)</span>
+            </div>
+          )}
         </div>
       </div>
 
