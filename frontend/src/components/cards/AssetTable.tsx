@@ -22,37 +22,165 @@ const RationaleTooltipPortal: React.FC<RationaleTooltipProps> = ({ asset, anchor
   useEffect(() => {
     if (anchorRef.current && isVisible) {
       const rect = anchorRef.current.getBoundingClientRect();
+      const tooltipWidth = 350;
+      const viewportWidth = window.innerWidth;
+
+      // Posicionar mais à esquerda do ícone
+      let left = rect.left - tooltipWidth - 10;
+
+      // Se ultrapassar a borda esquerda, colocar à direita do ícone
+      if (left < 10) {
+        left = rect.right + 10;
+      }
+
+      // Se ainda ultrapassar a borda direita, centralizar na tela
+      if (left + tooltipWidth > viewportWidth - 10) {
+        left = Math.max(10, (viewportWidth - tooltipWidth) / 2);
+      }
+
       setCoords({
-        top: rect.bottom + window.scrollY + 8,
-        left: rect.left + window.scrollX + rect.width / 2 - 160,
+        top: rect.bottom + 8,
+        left: left,
       });
     }
   }, [anchorRef, isVisible]);
 
-  if (!isVisible || !asset.rationale) return null;
+  if (!isVisible) return null;
+
+  // Helpers para formatação
+  const formatCurrency = (value: number | null | undefined) => {
+    if (value === null || value === undefined) return '-';
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value);
+  };
+
+  const formatPercent = (value: number | null | undefined) => {
+    if (value === null || value === undefined) return '-';
+    return `${value.toFixed(1)}%`;
+  };
+
+  // Helpers para status de indicadores
+  const getPriceStatus = () => {
+    if (!asset.currentPrice || !asset.ceilingPrice) return null;
+    const ratio = asset.currentPrice / asset.ceilingPrice;
+    if (ratio <= 0.8) return { label: 'Muito Barato', color: 'text-green-600', bg: 'bg-green-100' };
+    if (ratio <= 1.0) return { label: 'Bom Preço', color: 'text-green-600', bg: 'bg-green-100' };
+    if (ratio <= 1.1) return { label: 'No Limite', color: 'text-yellow-600', bg: 'bg-yellow-100' };
+    return { label: 'Acima do Teto', color: 'text-red-600', bg: 'bg-red-100' };
+  };
+
+  const getDYStatus = (dy: number | null | undefined) => {
+    if (!dy) return null;
+    if (dy >= 8) return { label: 'Excelente', color: 'text-green-600' };
+    if (dy >= 6) return { label: 'Bom', color: 'text-green-600' };
+    if (dy >= 4) return { label: 'Razoável', color: 'text-yellow-600' };
+    return { label: 'Baixo', color: 'text-gray-500' };
+  };
+
+  const priceStatus = getPriceStatus();
+  const dyStatus = getDYStatus(asset.expectedDY);
 
   return ReactDOM.createPortal(
     <div
-      className="fixed z-[9999] bg-white border border-gray-200 rounded-xl shadow-xl p-4 w-80 pointer-events-none"
-      style={{ top: coords.top, left: Math.max(10, coords.left) }}
+      className="fixed z-[9999] bg-white border border-gray-200 rounded-xl shadow-2xl p-4 w-[350px]"
+      style={{ top: coords.top, left: coords.left }}
     >
       {/* Header com ticker */}
-      <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gray-100">
-        <span className="text-lg">💡</span>
-        <span className="font-bold text-gray-800">{asset.ticker}</span>
-        <span className="text-xs text-gray-500">- Por que escolhemos?</span>
+      <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">📊</span>
+          <span className="font-bold text-gray-800 text-lg">{asset.ticker}</span>
+        </div>
+        <span className="text-xs px-2 py-1 bg-indigo-100 text-indigo-700 rounded-full">{asset.type}</span>
       </div>
 
-      {/* Análise/Rationale */}
-      <p className="text-sm text-gray-700 leading-relaxed">
-        {asset.rationale}
-      </p>
+      {/* Grid de Indicadores */}
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        {/* Preço Atual */}
+        <div className="bg-gray-50 rounded-lg p-2">
+          <span className="text-xs text-gray-500 block">Preço Atual</span>
+          <span className="font-bold text-gray-900">{formatCurrency(asset.currentPrice)}</span>
+        </div>
 
-      {/* Info adicional se tiver DY */}
-      {asset.expectedDY && (
-        <div className="mt-3 pt-2 border-t border-gray-100 flex items-center gap-2">
-          <span className="text-xs text-gray-500">DY Esperado:</span>
-          <span className="text-xs font-semibold text-green-600">{asset.expectedDY.toFixed(1)}%</span>
+        {/* Preço Teto */}
+        <div className="bg-gray-50 rounded-lg p-2">
+          <span className="text-xs text-gray-500 block">Preço Teto</span>
+          <span className="font-bold text-gray-900">{formatCurrency(asset.ceilingPrice)}</span>
+        </div>
+
+        {/* DY Esperado */}
+        {asset.expectedDY !== null && asset.expectedDY !== undefined && (
+          <div className="bg-gray-50 rounded-lg p-2">
+            <span className="text-xs text-gray-500 block">Dividend Yield</span>
+            <div className="flex items-center gap-1">
+              <span className="font-bold text-gray-900">{formatPercent(asset.expectedDY)}</span>
+              {dyStatus && (
+                <span className={`text-xs ${dyStatus.color}`}>({dyStatus.label})</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Alocação */}
+        <div className="bg-gray-50 rounded-lg p-2">
+          <span className="text-xs text-gray-500 block">Alocação Sugerida</span>
+          <span className="font-bold text-indigo-600">{asset.targetAllocation}%</span>
+        </div>
+      </div>
+
+      {/* Status do Preço */}
+      {priceStatus && (
+        <div className={`rounded-lg p-2 mb-3 ${priceStatus.bg}`}>
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-600">Status do Preço:</span>
+            <span className={`font-bold text-sm ${priceStatus.color}`}>{priceStatus.label}</span>
+          </div>
+          {asset.currentPrice && asset.ceilingPrice && (
+            <div className="mt-1">
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className={`h-2 rounded-full ${
+                    asset.currentPrice <= asset.ceilingPrice ? 'bg-green-500' : 'bg-red-500'
+                  }`}
+                  style={{ width: `${Math.min(100, (asset.currentPrice / asset.ceilingPrice) * 100)}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>0%</span>
+                <span>Teto (100%)</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Análise/Rationale */}
+      {asset.rationale && (
+        <div className="bg-indigo-50 rounded-lg p-3">
+          <div className="flex items-center gap-1 mb-1">
+            <span className="text-sm">💡</span>
+            <span className="text-xs font-semibold text-indigo-800">Por que escolhemos?</span>
+          </div>
+          <p className="text-sm text-gray-700 leading-relaxed">
+            {asset.rationale}
+          </p>
+        </div>
+      )}
+
+      {/* Viés */}
+      {asset.bias && asset.bias !== '-' && (
+        <div className="mt-3 flex items-center justify-center">
+          <span
+            className={`px-4 py-2 rounded-full text-sm font-bold ${
+              asset.bias === 'Comprar'
+                ? 'bg-green-100 text-green-800'
+                : 'bg-yellow-100 text-yellow-800'
+            }`}
+          >
+            {asset.bias === 'Comprar' ? '✅ Momento de Compra' : '⏳ Aguardar Melhor Preço'}
+          </span>
         </div>
       )}
 
@@ -63,34 +191,35 @@ const RationaleTooltipPortal: React.FC<RationaleTooltipProps> = ({ asset, anchor
   );
 };
 
-// Celula com tooltip de análise
-interface AnalysisCellProps {
+// Celula de Viés com tooltip
+interface BiasCellProps {
   asset: RecommendedAsset;
 }
 
-const AnalysisCell: React.FC<AnalysisCellProps> = ({ asset }) => {
+const getBiasStyle = (bias: string | undefined) => {
+  switch (bias) {
+    case 'Comprar':
+      return 'bg-green-100 text-green-800 hover:bg-green-200';
+    case 'Aguardar':
+      return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200';
+    default:
+      return 'bg-gray-100 text-gray-600 hover:bg-gray-200';
+  }
+};
+
+const BiasCell: React.FC<BiasCellProps> = ({ asset }) => {
   const [isHovered, setIsHovered] = useState(false);
   const anchorRef = useRef<HTMLSpanElement>(null);
 
-  if (!asset.rationale) {
-    return (
-      <td className="px-3 py-3 text-center">
-        <span className="text-gray-400 text-xs">-</span>
-      </td>
-    );
-  }
-
   return (
-    <td className="px-3 py-3 text-center">
+    <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
       <span
         ref={anchorRef}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-indigo-100 hover:bg-indigo-200 cursor-help transition-colors"
+        className={`px-2 py-1 rounded-full text-xs font-semibold cursor-help transition-colors ${getBiasStyle(asset.bias)}`}
       >
-        <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
+        {asset.bias || '-'}
       </span>
       <RationaleTooltipPortal asset={asset} anchorRef={anchorRef} isVisible={isHovered} />
     </td>
@@ -113,17 +242,6 @@ const AssetTable = ({ assets, showDY = false, isFixedIncome = false, onAssetSele
     return `${value.toFixed(1)}%`;
   };
 
-  const getBiasStyle = (bias: string | undefined) => {
-    switch (bias) {
-      case 'Comprar':
-        return 'bg-green-100 text-green-800';
-      case 'Aguardar':
-        return 'bg-yellow-100 text-yellow-800';
-      default:
-        return 'bg-gray-100 text-gray-600';
-    }
-  };
-
   // Tabela simplificada para Renda Fixa
   if (isFixedIncome) {
     return (
@@ -144,7 +262,7 @@ const AssetTable = ({ assets, showDY = false, isFixedIncome = false, onAssetSele
                 Alocacao
               </th>
               <th className="px-3 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                Analise
+                Info
               </th>
             </tr>
           </thead>
@@ -168,7 +286,7 @@ const AssetTable = ({ assets, showDY = false, isFixedIncome = false, onAssetSele
                 <td className="px-3 py-3 text-center text-sm font-semibold text-indigo-600">
                   {asset.targetAllocation}%
                 </td>
-                <AnalysisCell asset={asset} />
+                <BiasCell asset={asset} />
               </tr>
             ))}
           </tbody>
@@ -209,9 +327,6 @@ const AssetTable = ({ assets, showDY = false, isFixedIncome = false, onAssetSele
             <th className="px-3 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Vies
             </th>
-            <th className="px-3 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              Analise
-            </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100 bg-white">
@@ -245,14 +360,7 @@ const AssetTable = ({ assets, showDY = false, isFixedIncome = false, onAssetSele
               <td className="px-3 py-3 text-center text-sm font-semibold text-indigo-600">
                 {asset.targetAllocation}%
               </td>
-              <td className="px-3 py-3 text-center">
-                <span
-                  className={`px-2 py-1 rounded-full text-xs font-semibold ${getBiasStyle(asset.bias)}`}
-                >
-                  {asset.bias || '-'}
-                </span>
-              </td>
-              <AnalysisCell asset={asset} />
+              <BiasCell asset={asset} />
             </tr>
           ))}
         </tbody>
