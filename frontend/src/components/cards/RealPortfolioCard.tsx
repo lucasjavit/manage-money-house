@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import type { RealPortfolioSummary, RealPortfolioPosition, RealPortfolioDividend, HealthScoreDetails } from '../../types';
 import { realPortfolioService } from '../../services/realPortfolioService';
+import AnalysisHelpModal from './AnalysisHelpModal';
 
 // Componente de Tooltip com Portal para renderizar fora da hierarquia do DOM
 interface TooltipPortalProps {
@@ -99,6 +100,143 @@ const ActionCell: React.FC<ActionCellProps> = ({ position }) => {
   );
 };
 
+// Componente de Tooltip de Vies com criterios de valuation
+const BiasTooltipPortal: React.FC<TooltipPortalProps> = ({ position, anchorRef, isVisible }) => {
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    if (isVisible && anchorRef.current) {
+      const rect = anchorRef.current.getBoundingClientRect();
+      setCoords({
+        top: rect.top - 10,
+        left: Math.min(rect.right - 320, window.innerWidth - 340),
+      });
+    }
+  }, [isVisible, anchorRef]);
+
+  if (!isVisible) return null;
+
+  const formatPE = (pe?: number) => pe != null ? pe.toFixed(2) : 'N/A';
+  const formatPVP = (pvp?: number) => pvp != null ? pvp.toFixed(2) : 'N/A';
+  const formatDY = (dy?: number) => dy != null ? `${(dy * 100).toFixed(2)}%` : 'N/A';
+
+  const getPEStatus = (pe?: number) => {
+    if (pe == null) return { label: '-', color: 'text-gray-400' };
+    if (pe < 8) return { label: 'Barato', color: 'text-green-600' };
+    if (pe > 15) return { label: 'Caro', color: 'text-red-600' };
+    return { label: 'Justo', color: 'text-gray-600' };
+  };
+
+  const getPVPStatus = (pvp?: number) => {
+    if (pvp == null) return { label: '-', color: 'text-gray-400' };
+    if (pvp < 1.0) return { label: 'Desconto', color: 'text-green-600' };
+    if (pvp > 2.0) return { label: 'Premio', color: 'text-red-600' };
+    return { label: 'Justo', color: 'text-gray-600' };
+  };
+
+  const getDYStatus = (dy?: number) => {
+    if (dy == null) return { label: '-', color: 'text-gray-400' };
+    if (dy > 0.08) return { label: 'Excelente', color: 'text-green-600' };
+    if (dy > 0.05) return { label: 'Bom', color: 'text-blue-600' };
+    if (dy > 0.03) return { label: 'Regular', color: 'text-gray-600' };
+    return { label: 'Baixo', color: 'text-red-600' };
+  };
+
+  const hasYahooData = position.yahooTrailingPE != null || position.yahooPriceToBook != null || position.yahooDividendYield != null;
+
+  return ReactDOM.createPortal(
+    <div
+      className="fixed z-[99999] w-80 p-4 bg-white rounded-lg shadow-2xl border border-gray-200 text-left pointer-events-none"
+      style={{
+        top: coords.top,
+        left: coords.left,
+        transform: 'translateY(-100%)',
+      }}
+    >
+      <div className="mb-3">
+        <h4 className="font-bold text-gray-800 mb-1">Criterios de Valuation</h4>
+        <p className="text-xs text-gray-500">Dados do Yahoo Finance</p>
+      </div>
+
+      {hasYahooData ? (
+        <>
+          {/* Tabela de indicadores */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">P/L (Preco/Lucro)</span>
+              <div className="flex items-center gap-2">
+                <span className="font-medium">{formatPE(position.yahooTrailingPE)}</span>
+                <span className={`text-xs ${getPEStatus(position.yahooTrailingPE).color}`}>
+                  {getPEStatus(position.yahooTrailingPE).label}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">P/VP</span>
+              <div className="flex items-center gap-2">
+                <span className="font-medium">{formatPVP(position.yahooPriceToBook)}</span>
+                <span className={`text-xs ${getPVPStatus(position.yahooPriceToBook).color}`}>
+                  {getPVPStatus(position.yahooPriceToBook).label}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">Dividend Yield</span>
+              <div className="flex items-center gap-2">
+                <span className="font-medium">{formatDY(position.yahooDividendYield)}</span>
+                <span className={`text-xs ${getDYStatus(position.yahooDividendYield).color}`}>
+                  {getDYStatus(position.yahooDividendYield).label}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {position.yahooSector && (
+            <div className="mt-3 pt-2 border-t border-gray-100">
+              <span className="text-xs text-gray-500">Setor: </span>
+              <span className="text-xs font-medium text-gray-700">{position.yahooSector}</span>
+            </div>
+          )}
+
+          {/* Analise da IA */}
+          {position.aiValuationAnalysis && (
+            <div className="mt-3 pt-2 border-t border-gray-100">
+              <p className="text-xs text-gray-600 leading-relaxed">
+                {position.aiValuationAnalysis}
+              </p>
+            </div>
+          )}
+
+          {/* Conclusao do Vies */}
+          <div className="mt-3 pt-2 border-t border-gray-100">
+            <div className="flex items-center gap-2">
+              <span className={`px-2 py-1 rounded text-xs font-bold ${getBiasColor(position.aiBias)}`}>
+                {getBiasLabel(position.aiBias)}
+              </span>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="text-center py-4 text-gray-400 text-sm">
+          {position.aiValuationAnalysis ? (
+            <p className="text-xs text-gray-600 leading-relaxed text-left">
+              {position.aiValuationAnalysis}
+            </p>
+          ) : (
+            <>
+              <p>Dados nao disponiveis</p>
+              <p className="text-xs mt-1">Reanalisar ativos para buscar</p>
+            </>
+          )}
+        </div>
+      )}
+    </div>,
+    document.body
+  );
+};
+
 // Componente de celula de Vies com tooltip
 const BiasCell: React.FC<ActionCellProps> = ({ position }) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -114,7 +252,7 @@ const BiasCell: React.FC<ActionCellProps> = ({ position }) => {
       >
         {getBiasLabel(position.aiBias)}
       </div>
-      <TooltipPortal position={position} anchorRef={anchorRef} isVisible={isHovered} />
+      <BiasTooltipPortal position={position} anchorRef={anchorRef} isVisible={isHovered} />
     </td>
   );
 };
@@ -447,6 +585,7 @@ const HealthScoreCard: React.FC<HealthScoreCardProps> = ({ healthScore, healthSc
 const RealPortfolioCard: React.FC<Props> = ({ portfolio, onNewUpload, onRefresh }) => {
   const [isAnalyzingAssets, setIsAnalyzingAssets] = useState(false);
   const [expandedSection, setExpandedSection] = useState<string | null>('stocks');
+  const [showHelpModal, setShowHelpModal] = useState(false);
   const hasTriggeredAnalysis = useRef(false);
 
   // Verificar se algum ativo ja tem analise
@@ -621,6 +760,14 @@ const RealPortfolioCard: React.FC<Props> = ({ portfolio, onNewUpload, onRefresh 
           </div>
           <div className="flex gap-2">
             <button
+              onClick={() => setShowHelpModal(true)}
+              className="px-3 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
+              title="Entender como funciona a analise"
+            >
+              <span>?</span>
+              <span className="hidden sm:inline">Como Funciona</span>
+            </button>
+            <button
               onClick={handleAnalyzeAssets}
               disabled={isAnalyzingAssets}
               className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
@@ -717,6 +864,9 @@ const RealPortfolioCard: React.FC<Props> = ({ portfolio, onNewUpload, onRefresh 
         <p>Dados importados do relatorio consolidado da B3</p>
         <p>Upload em: {portfolio.uploadedAt ? new Date(portfolio.uploadedAt).toLocaleString('pt-BR') : '-'}</p>
       </div>
+
+      {/* Modal de ajuda */}
+      {showHelpModal && <AnalysisHelpModal onClose={() => setShowHelpModal(false)} />}
     </div>
   );
 };

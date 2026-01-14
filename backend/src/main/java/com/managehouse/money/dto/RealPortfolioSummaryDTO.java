@@ -76,7 +76,14 @@ public class RealPortfolioSummaryDTO {
         private BigDecimal aiConfidenceScore; // 0.00 a 1.00
         private BigDecimal aiCeilingPrice; // Preco teto
         private String aiBias; // Vies: COMPRA, VENDA, NEUTRO
+        private String aiValuationAnalysis; // Analise detalhada dos indicadores de valuation
         private String aiAnalyzedAt; // Data da analise
+
+        // Dados fundamentalistas do Yahoo Finance
+        private BigDecimal yahooTrailingPE; // P/L do Yahoo Finance
+        private BigDecimal yahooPriceToBook; // P/VP do Yahoo Finance
+        private BigDecimal yahooDividendYield; // DY do Yahoo Finance (0.08 = 8%)
+        private String yahooSector; // Setor do Yahoo Finance
     }
 
     @Data

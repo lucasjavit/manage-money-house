@@ -91,9 +91,46 @@ const PortfolioCard: React.FC<PortfolioCardProps> = ({ portfolio }) => {
         </ul>
       </div>
 
+      {/* Seção Explicativa: Por que esses ativos? */}
+      {recommendedAssets.length > 0 && (
+        <div className="mt-4 pt-4 border-t border-indigo-200">
+          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-4 mb-4">
+            <h4 className="text-sm font-bold text-indigo-800 mb-2 flex items-center gap-2">
+              <span className="text-lg">💡</span>
+              Por que escolhemos esses ativos?
+            </h4>
+            <p className="text-xs text-gray-600 mb-3">
+              Cada ativo foi selecionado com base em análise fundamentalista.
+              Passe o mouse no ícone <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-indigo-200 text-indigo-600 text-xs mx-1">ℹ</span>
+              na coluna "Análise" para ver o motivo específico de cada escolha.
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+              <div className="bg-white rounded-lg p-2 text-center">
+                <span className="block text-indigo-600 font-bold text-lg">{recommendedAssets.length}</span>
+                <span className="text-gray-500">Ativos</span>
+              </div>
+              <div className="bg-white rounded-lg p-2 text-center">
+                <span className="block text-green-600 font-bold text-lg">{goodPriceAssets.length}</span>
+                <span className="text-gray-500">Bom Preço</span>
+              </div>
+              <div className="bg-white rounded-lg p-2 text-center">
+                <span className="block text-orange-600 font-bold text-lg">{aboveCeilingAssets.length}</span>
+                <span className="text-gray-500">Aguardar</span>
+              </div>
+              <div className="bg-white rounded-lg p-2 text-center">
+                <span className="block text-purple-600 font-bold text-lg">
+                  {new Set(recommendedAssets.map(a => a.type)).size}
+                </span>
+                <span className="text-gray-500">Tipos</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Ativos com Bom Preço (Comprar) */}
       {goodPriceAssets.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-indigo-200">
+        <div className="mt-4">
           <h4 className="text-sm font-semibold text-green-700 mb-3 flex items-center gap-2">
             <span className="w-2 h-2 bg-green-500 rounded-full"></span>
             Ativos Recomendados para Compra ({goodPriceAssets.length})

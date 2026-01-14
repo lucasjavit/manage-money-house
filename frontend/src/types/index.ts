@@ -672,7 +672,13 @@ export interface RealPortfolioPosition {
   aiConfidenceScore?: number;
   aiCeilingPrice?: number;
   aiBias?: 'COMPRA' | 'VENDA' | 'NEUTRO';
+  aiValuationAnalysis?: string; // Analise detalhada dos indicadores de valuation
   aiAnalyzedAt?: string;
+  // Dados fundamentalistas do Yahoo Finance
+  yahooTrailingPE?: number;    // P/L
+  yahooPriceToBook?: number;   // P/VP
+  yahooDividendYield?: number; // DY (0.08 = 8%)
+  yahooSector?: string;        // Setor
 }
 
 export interface RealPortfolioDividend {

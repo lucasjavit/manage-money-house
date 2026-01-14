@@ -456,7 +456,45 @@ public class MarketDataService {
                 .characteristics(Arrays.asList("Alto potencial de retorno", "Alta volatilidade"))
                 .build());
 
-        // 5. Carteira Cripto
+        // 5. Carteira de Renda Fixa
+        portfolios.add(InvestmentPortfolio.builder()
+                .name("Carteira de Renda Fixa")
+                .description("Foco em segurança e previsibilidade de retornos.")
+                .strategy("Preservação de capital, liquidez e rentabilidade real")
+                .riskLevel("Baixo")
+                .icon("🏦")
+                .suggestedComposition(Arrays.asList(
+                        PortfolioAsset.builder().type("Tesouro Direto").percentage(50).description("Títulos Públicos").build(),
+                        PortfolioAsset.builder().type("CDBs/LCIs/LCAs").percentage(30).description("Títulos Bancários").build(),
+                        PortfolioAsset.builder().type("Debêntures").percentage(20).description("Crédito Privado").build()
+                ))
+                .recommendedAssets(Arrays.asList(
+                        RecommendedAsset.builder().rank(1).ticker("TESOURO SELIC 2029").name("Tesouro Selic 2029").type("Renda Fixa")
+                                .expectedDY(null).entryPrice(null).ceilingPrice(null).targetAllocation(20.0)
+                                .rationale("Liquidez diária, segurança máxima, rentabilidade atrelada à SELIC. Ideal para reserva de emergência.").build(),
+                        RecommendedAsset.builder().rank(2).ticker("IPCA+ 2035").name("Tesouro IPCA+ 2035").type("Renda Fixa")
+                                .expectedDY(null).entryPrice(null).ceilingPrice(null).targetAllocation(20.0)
+                                .rationale("Proteção contra inflação, rentabilidade real garantida. Ideal para aposentadoria e metas de longo prazo.").build(),
+                        RecommendedAsset.builder().rank(3).ticker("PREFIXADO 2027").name("Tesouro Prefixado 2027").type("Renda Fixa")
+                                .expectedDY(null).entryPrice(null).ceilingPrice(null).targetAllocation(10.0)
+                                .rationale("Taxa fixa conhecida no momento da compra. Bom para cenários de queda de juros.").build(),
+                        RecommendedAsset.builder().rank(4).ticker("CDB 120% CDI").name("CDB 120% CDI").type("Renda Fixa")
+                                .expectedDY(null).entryPrice(null).ceilingPrice(null).targetAllocation(15.0)
+                                .rationale("Rentabilidade superior ao CDI, proteção do FGC até R$250mil. Bancos médios oferecem melhores taxas.").build(),
+                        RecommendedAsset.builder().rank(5).ticker("LCI 95% CDI").name("LCI 95% CDI").type("Renda Fixa")
+                                .expectedDY(null).entryPrice(null).ceilingPrice(null).targetAllocation(15.0)
+                                .rationale("Isento de IR para pessoa física. Equivale a ~111% CDI em CDB. Proteção FGC.").build(),
+                        RecommendedAsset.builder().rank(6).ticker("LCA 94% CDI").name("LCA 94% CDI").type("Renda Fixa")
+                                .expectedDY(null).entryPrice(null).ceilingPrice(null).targetAllocation(10.0)
+                                .rationale("Isento de IR, lastro em crédito do agronegócio. Boa diversificação de emissor.").build(),
+                        RecommendedAsset.builder().rank(7).ticker("DEBENTURE INFRA").name("Debênture Incentivada").type("Renda Fixa")
+                                .expectedDY(null).entryPrice(null).ceilingPrice(null).targetAllocation(10.0)
+                                .rationale("Isenta de IR, financia projetos de infraestrutura. Maior risco de crédito, maior retorno.").build()
+                ))
+                .characteristics(Arrays.asList("Baixo risco", "Previsibilidade", "Proteção contra inflação", "Liquidez variada"))
+                .build());
+
+        // 6. Carteira Cripto
         portfolios.add(InvestmentPortfolio.builder()
                 .name("Carteira de Criptomoedas")
                 .description("Exposição a ativos digitais.")

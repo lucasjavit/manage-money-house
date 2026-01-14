@@ -71,5 +71,21 @@ public class PortfolioPosition {
     @Column(length = 20)
     private String aiBias; // Vies: COMPRA, VENDA, NEUTRO
 
+    @Column(columnDefinition = "TEXT")
+    private String aiValuationAnalysis; // Analise detalhada dos indicadores de valuation
+
     private LocalDateTime aiAnalyzedAt; // Data da analise
+
+    // Dados fundamentalistas do Yahoo Finance (salvos para exibir no tooltip)
+    @Column(precision = 10, scale = 2)
+    private BigDecimal yahooTrailingPE; // P/L do Yahoo Finance
+
+    @Column(precision = 10, scale = 2)
+    private BigDecimal yahooPriceToBook; // P/VP do Yahoo Finance
+
+    @Column(precision = 10, scale = 4)
+    private BigDecimal yahooDividendYield; // DY do Yahoo Finance (0.08 = 8%)
+
+    @Column(length = 100)
+    private String yahooSector; // Setor do Yahoo Finance
 }

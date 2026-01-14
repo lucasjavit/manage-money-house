@@ -12,13 +12,14 @@ import MyPortfolioCard from './cards/MyPortfolioCard';
 import RealPortfolioUpload from './cards/RealPortfolioUpload';
 import RealPortfolioCard from './cards/RealPortfolioCard';
 
-// Definição estática das abas de carteiras (sem dados carregados)
+// Definição estática das abas de carteiras (deve corresponder à ordem do backend)
+// Backend: Valor(0), Dividendos(1), Internacional(2), Small Caps(3), Renda Fixa(4), Cripto(5)
 const PORTFOLIO_TABS = [
   { id: 'valor', name: 'Valor', icon: '💎' },
   { id: 'dividendos', name: 'Dividendos', icon: '💰' },
-  { id: 'renda-fixa', name: 'Renda Fixa', icon: '🏦' },
   { id: 'internacional', name: 'Internacional', icon: '🌎' },
   { id: 'small-caps', name: 'Small Caps', icon: '🚀' },
+  { id: 'renda-fixa', name: 'Renda Fixa', icon: '🏦' },
   { id: 'cripto', name: 'Criptomoedas', icon: '₿' },
 ];
 

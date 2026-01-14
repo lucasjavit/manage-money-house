@@ -126,6 +126,41 @@ const MyPortfolioCard: React.FC<MyPortfolioCardProps> = ({ portfolio, onRegenera
         )}
       </div>
 
+      {/* Seção Explicativa: Por que esses ativos? */}
+      {recommendedAssets.length > 0 && (
+        <div className="bg-gradient-to-r from-teal-50 to-cyan-50 rounded-xl p-5 border border-teal-200">
+          <h4 className="text-base font-bold text-teal-800 mb-2 flex items-center gap-2">
+            <span className="text-xl">💡</span>
+            Por que escolhemos esses ativos?
+          </h4>
+          <p className="text-sm text-gray-600 mb-4">
+            A IA selecionou cada ativo com base no seu perfil de risco, análise fundamentalista e preço atual vs. preço-teto.
+            Passe o mouse no ícone <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-teal-200 text-teal-700 text-xs mx-1">ℹ</span>
+            na coluna "Análise" para ver o motivo específico de cada escolha.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="bg-white rounded-lg p-3 text-center border border-teal-100">
+              <span className="block text-teal-600 font-bold text-xl">{recommendedAssets.length}</span>
+              <span className="text-xs text-gray-500">Total Ativos</span>
+            </div>
+            <div className="bg-white rounded-lg p-3 text-center border border-green-100">
+              <span className="block text-green-600 font-bold text-xl">{goodPriceAssets.length}</span>
+              <span className="text-xs text-gray-500">Bom Preço</span>
+            </div>
+            <div className="bg-white rounded-lg p-3 text-center border border-orange-100">
+              <span className="block text-orange-600 font-bold text-xl">{aboveCeilingAssets.length}</span>
+              <span className="text-xs text-gray-500">Aguardar</span>
+            </div>
+            <div className="bg-white rounded-lg p-3 text-center border border-purple-100">
+              <span className="block text-purple-600 font-bold text-xl">
+                {new Set(recommendedAssets.map(a => a.type)).size}
+              </span>
+              <span className="text-xs text-gray-500">Classes</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Assets - Good Price */}
       {goodPriceAssets.length > 0 && (
         <div className="bg-white rounded-xl p-6 border border-green-200 shadow-sm">

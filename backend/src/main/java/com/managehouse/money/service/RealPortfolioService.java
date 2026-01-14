@@ -3,6 +3,7 @@ package com.managehouse.money.service;
 import com.managehouse.money.config.ChatModelFactory;
 import com.managehouse.money.dto.B3ReportUploadResponse;
 import com.managehouse.money.dto.RealPortfolioSummaryDTO;
+import com.managehouse.money.dto.YahooFinanceDTO;
 import com.managehouse.money.entity.PortfolioDividend;
 import com.managehouse.money.entity.PortfolioPosition;
 import com.managehouse.money.entity.UserRealPortfolio;
@@ -38,6 +39,7 @@ public class RealPortfolioService {
     private final PortfolioDividendRepository dividendRepository;
     private final ChatModelFactory chatModelFactory;
     private final ConfigurationService configurationService;
+    private final YahooFinanceService yahooFinanceService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Transactional
@@ -260,7 +262,32 @@ public class RealPortfolioService {
             try {
                 log.info("Analisando ativo: {} ({})", position.getTicker(), position.getAssetType());
 
-                String prompt = buildAssetAnalysisPrompt(position, portfolio);
+                // Buscar dados fundamentalistas do Yahoo Finance para acoes e FIIs
+                YahooFinanceDTO fundamentals = null;
+                if ("ACAO".equals(position.getAssetType()) || "FII".equals(position.getAssetType())) {
+                    fundamentals = yahooFinanceService.getStockFundamentals(position.getTicker());
+                    if (fundamentals.isDataAvailable()) {
+                        log.info("Dados Yahoo Finance obtidos para {}: P/L={}, P/VP={}, DY={}",
+                                position.getTicker(),
+                                fundamentals.getFormattedPE(),
+                                fundamentals.getFormattedPB(),
+                                fundamentals.getFormattedDY());
+
+                        // Salvar dados do Yahoo Finance na posicao para exibir no tooltip
+                        position.setYahooTrailingPE(fundamentals.getTrailingPE() != null
+                                ? BigDecimal.valueOf(fundamentals.getTrailingPE()) : null);
+                        position.setYahooPriceToBook(fundamentals.getPriceToBook() != null
+                                ? BigDecimal.valueOf(fundamentals.getPriceToBook()) : null);
+                        position.setYahooDividendYield(fundamentals.getDividendYield() != null
+                                ? BigDecimal.valueOf(fundamentals.getDividendYield()) : null);
+                        position.setYahooSector(fundamentals.getSector());
+                    } else {
+                        log.warn("Dados Yahoo Finance indisponiveis para {}: {}",
+                                position.getTicker(), fundamentals.getErrorMessage());
+                    }
+                }
+
+                String prompt = buildAssetAnalysisPrompt(position, portfolio, fundamentals);
                 String aiResponse = chatModel.generate(prompt);
 
                 // Parsear resposta JSON da IA
@@ -600,7 +627,7 @@ public class RealPortfolioService {
         return recommendations;
     }
 
-    private String buildAssetAnalysisPrompt(PortfolioPosition position, UserRealPortfolio portfolio) {
+    private String buildAssetAnalysisPrompt(PortfolioPosition position, UserRealPortfolio portfolio, YahooFinanceDTO fundamentals) {
         BigDecimal grandTotal = portfolio.getGrandTotal() != null ? portfolio.getGrandTotal() : BigDecimal.ONE;
         BigDecimal totalValue = position.getTotalValue() != null ? position.getTotalValue() : BigDecimal.ZERO;
 
@@ -608,8 +635,11 @@ public class RealPortfolioService {
                 .divide(grandTotal, 4, RoundingMode.HALF_UP)
                 .multiply(new BigDecimal("100"));
 
+        // Construir secao de dados fundamentalistas
+        String fundamentalsSection = buildFundamentalsSection(fundamentals);
+
         return """
-            Voce e um analista de investimentos CNPI brasileiro. Siga ESTRITAMENTE as regras abaixo.
+            Voce e um analista de investimentos CNPI brasileiro. Analise com base nos DADOS REAIS abaixo.
 
             ATIVO A ANALISAR:
             - Ticker: %s
@@ -624,64 +654,76 @@ public class RealPortfolioService {
             CONTEXTO DA CARTEIRA:
             - Total: R$ %s | Acoes: R$ %s | FIIs: R$ %s | Renda Fixa: R$ %s
 
+            %s
+
             ============================================================
-            REGRAS OBRIGATORIAS - SIGA EXATAMENTE (NAO INTERPRETE):
+            REGRAS DE ANALISE FUNDAMENTALISTA:
             ============================================================
 
             1. CONCENTRACAO (regra fixa):
                - Se percentual > 20%% da carteira → recommendation = "VENDER"
-               - Se percentual entre 10-20%% → mencionar risco na analysis, mas pode ser "MANTER"
-               - Se percentual < 10%% → OK, nao penalizar
+               - Se percentual entre 10-20%% → mencionar risco, pode ser "MANTER"
+               - Se percentual < 10%% → OK
 
-            2. PARA ACOES - Calcular preco teto (ceilingPrice):
-               Use P/L justo FIXO por setor:
-               - Bancos (BBAS3, ITUB4, BBDC4, SANB11): P/L = 8x → ceilingPrice = precoAtual * 1.15
-               - Utilities/Energia (TAEE11, EGIE3, CPFE3, CMIG4): P/L = 12x → ceilingPrice = precoAtual * 1.20
-               - Commodities (VALE3, PETR4, CSAN3): P/L = 6x → ceilingPrice = precoAtual * 1.10
-               - Varejo/Consumo (MGLU3, LREN3, PCAR3): P/L = 15x → ceilingPrice = precoAtual * 1.25
-               - Outros: P/L = 10x → ceilingPrice = precoAtual * 1.18
+            2. PARA ACOES COM DADOS REAIS (se P/L e P/VP disponiveis):
+               VALUATION:
+               - P/L < 8 E P/VP < 1.0 → ativo SUBVALORIZADO → considerar "COMPRAR_MAIS"
+               - P/L > 15 OU P/VP > 2.0 → ativo CARO → considerar "VENDER" ou "MANTER"
+               - P/L entre 8-15 E P/VP entre 0.8-1.5 → ativo JUSTO → "MANTER"
 
-            3. PARA FIIs - Calcular preco teto:
-               - P/VP justo = 1.0 (SEMPRE)
-               - ceilingPrice = precoAtual * 1.05 (margem de 5%%)
-               - FIIs de papel (RECR11, KNSC11, MXRF11): riskLevel = "BAIXO"
-               - FIIs de tijolo: riskLevel = "MEDIO"
+               PRECO TETO (calcule usando LPA real se disponivel):
+               - ceilingPrice = LPA * P/L_justo_do_setor
+               - Bancos: P/L justo = 8
+               - Utilities/Energia: P/L justo = 12
+               - Commodities: P/L justo = 6
+               - Varejo/Consumo: P/L justo = 15
+               - Outros: P/L justo = 10
 
-            4. PARA RENDA FIXA (CDB, LCA, LCI, DEBENTURE):
-               - Se nome contem "Master", "BRK", "Portocred", "Open", "Digimais" → recommendation = "VENDER", riskLevel = "ALTO"
-               - Se vencimento < 6 meses → riskLevel = "BAIXO", recommendation = "MANTER"
-               - Se vencimento entre 6 meses e 2 anos → riskLevel = "BAIXO", recommendation = "MANTER"
-               - Se vencimento > 2 anos → riskLevel = "MEDIO", recommendation = "MANTER"
-               - ceilingPrice = null (SEMPRE para renda fixa)
-               - bias = "NEUTRO" (SEMPRE para renda fixa)
+               DIVIDEND YIELD:
+               - DY > 6%% → ponto POSITIVO, mencionar na analise
+               - DY < 3%% para empresa madura → ponto NEGATIVO
 
-            5. BIAS (obrigatorio, siga a formula):
-               - "COMPRA" se tipo = ACAO ou FII e ativo tem bons fundamentos conhecidos
+            3. PARA ACOES SEM DADOS (fallback):
+               - Use multiplicadores fixos: ceilingPrice = precoAtual * 1.15
+               - confidenceScore = 0.60 (menor confianca)
+
+            4. PARA FIIs:
+               - P/VP > 1.1 → CARO → considerar "VENDER"
+               - P/VP < 0.9 → BARATO → considerar "COMPRAR_MAIS"
+               - P/VP entre 0.9-1.1 → JUSTO → "MANTER"
+               - ceilingPrice = precoAtual / P/VP_atual (para chegar em P/VP = 1.0)
+               - DY < 8%% aa → ponto negativo
+
+            5. PARA RENDA FIXA (CDB, LCA, LCI, DEBENTURE):
+               - Se nome contem "Master", "BRK", "Portocred", "Open", "Digimais" → "VENDER", riskLevel = "ALTO"
+               - Se vencimento < 6 meses → riskLevel = "BAIXO"
+               - Se vencimento > 2 anos → riskLevel = "MEDIO"
+               - ceilingPrice = null (SEMPRE)
+               - bias = "NEUTRO" (SEMPRE)
+
+            6. BIAS:
+               - "COMPRA" se P/L < 10 E P/VP < 1.0 E DY > 5%%
                - "VENDA" se recomendacao = "VENDER"
-               - "NEUTRO" para renda fixa OU se nao ha dados suficientes
+               - "NEUTRO" nos demais casos
 
-            6. CONFIDENCE SCORE (valores fixos):
-               - 0.85 se acao/FII com ticker conhecido (BBAS3, VALE3, RECR11, etc)
-               - 0.70 se acao/FII com ticker desconhecido
-               - 0.90 para renda fixa de banco grande (Itau, BB, Bradesco, BTG)
-               - 0.60 para renda fixa de banco pequeno
+            7. CONFIDENCE SCORE:
+               - 0.90 se tem dados Yahoo Finance completos (P/L, P/VP, DY)
+               - 0.75 se tem dados parciais
+               - 0.60 se nao tem dados fundamentalistas
                - 0.30 para renda fixa de banco em liquidacao
-
-            7. RECOMENDACAO PADRAO:
-               - Se nenhuma regra de VENDER se aplica → recommendation = "MANTER"
-               - Use "COMPRAR_MAIS" apenas se preco atual < ceilingPrice * 0.85 (15%% abaixo do teto)
 
             ============================================================
 
             Responda APENAS em JSON valido (sem markdown, sem ```):
             {
               "recommendation": "MANTER",
-              "analysis": "Justificativa em 2 frases baseada nas regras acima",
+              "analysis": "Justificativa em 2 frases usando os indicadores reais",
               "mainReason": "Frase curta (max 50 chars)",
               "riskLevel": "BAIXO",
-              "confidenceScore": 0.85,
+              "confidenceScore": 0.90,
               "ceilingPrice": 25.50,
-              "bias": "COMPRA"
+              "bias": "COMPRA",
+              "valuationAnalysis": "Analise de 2-3 frases explicando os indicadores: P/L indica X, P/VP mostra Y, DY sugere Z. Conclusao do vies."
             }
 
             Valores permitidos:
@@ -689,6 +731,7 @@ public class RealPortfolioService {
             - riskLevel: "BAIXO", "MEDIO", "ALTO"
             - bias: "COMPRA", "VENDA", "NEUTRO"
             - ceilingPrice: numero decimal ou null
+            - valuationAnalysis: texto explicando os indicadores de valuation e justificando o vies
             """.formatted(
                 position.getTicker(),
                 position.getName(),
@@ -701,8 +744,112 @@ public class RealPortfolioService {
                 portfolio.getGrandTotal() != null ? portfolio.getGrandTotal() : BigDecimal.ZERO,
                 portfolio.getTotalStocks() != null ? portfolio.getTotalStocks() : BigDecimal.ZERO,
                 portfolio.getTotalFiis() != null ? portfolio.getTotalFiis() : BigDecimal.ZERO,
-                portfolio.getTotalFixedIncome() != null ? portfolio.getTotalFixedIncome() : BigDecimal.ZERO
+                portfolio.getTotalFixedIncome() != null ? portfolio.getTotalFixedIncome() : BigDecimal.ZERO,
+                fundamentalsSection
         );
+    }
+
+    /**
+     * Constroi a secao de dados fundamentalistas para o prompt
+     */
+    private String buildFundamentalsSection(YahooFinanceDTO fundamentals) {
+        if (fundamentals == null || !fundamentals.isDataAvailable()) {
+            return """
+            DADOS FUNDAMENTALISTAS (Yahoo Finance):
+            - Dados NAO DISPONIVEIS para este ativo
+            - Use as regras de fallback com multiplicadores fixos
+            """;
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("DADOS FUNDAMENTALISTAS REAIS (Yahoo Finance):\n");
+
+        if (fundamentals.getTrailingPE() != null) {
+            sb.append(String.format("- P/L (Preco/Lucro): %.2f", fundamentals.getTrailingPE()));
+            if (fundamentals.getTrailingPE() < 8) sb.append(" [BARATO]");
+            else if (fundamentals.getTrailingPE() > 15) sb.append(" [CARO]");
+            else sb.append(" [JUSTO]");
+            sb.append("\n");
+        } else {
+            sb.append("- P/L: N/A\n");
+        }
+
+        if (fundamentals.getPriceToBook() != null) {
+            sb.append(String.format("- P/VP (Preco/Valor Patrimonial): %.2f", fundamentals.getPriceToBook()));
+            if (fundamentals.getPriceToBook() < 1.0) sb.append(" [BARATO - abaixo do VPA]");
+            else if (fundamentals.getPriceToBook() > 2.0) sb.append(" [CARO]");
+            else sb.append(" [JUSTO]");
+            sb.append("\n");
+        } else {
+            sb.append("- P/VP: N/A\n");
+        }
+
+        if (fundamentals.getDividendYield() != null) {
+            double dyPercent = fundamentals.getDividendYield() * 100;
+            sb.append(String.format("- Dividend Yield: %.2f%%", dyPercent));
+            if (dyPercent > 6) sb.append(" [EXCELENTE]");
+            else if (dyPercent > 4) sb.append(" [BOM]");
+            else if (dyPercent < 2) sb.append(" [BAIXO]");
+            sb.append("\n");
+        } else {
+            sb.append("- Dividend Yield: N/A\n");
+        }
+
+        if (fundamentals.getTrailingEps() != null) {
+            sb.append(String.format("- LPA (Lucro por Acao): R$ %.2f\n", fundamentals.getTrailingEps()));
+        }
+
+        if (fundamentals.getBookValue() != null) {
+            sb.append(String.format("- VPA (Valor Patrimonial por Acao): R$ %.2f\n", fundamentals.getBookValue()));
+        }
+
+        if (fundamentals.getRegularMarketPrice() != null) {
+            sb.append(String.format("- Preco de Mercado (Yahoo): R$ %.2f\n", fundamentals.getRegularMarketPrice()));
+        }
+
+        if (fundamentals.getFiftyTwoWeekHigh() != null && fundamentals.getFiftyTwoWeekLow() != null) {
+            sb.append(String.format("- Range 52 semanas: R$ %.2f - R$ %.2f\n",
+                    fundamentals.getFiftyTwoWeekLow(), fundamentals.getFiftyTwoWeekHigh()));
+        }
+
+        if (fundamentals.getSector() != null) {
+            sb.append(String.format("- Setor: %s\n", fundamentals.getSector()));
+        }
+
+        if (fundamentals.getIndustry() != null) {
+            sb.append(String.format("- Industria: %s\n", fundamentals.getIndustry()));
+        }
+
+        // Adicionar calculo de preco teto sugerido
+        if (fundamentals.getTrailingEps() != null && fundamentals.getTrailingEps() > 0) {
+            double fairPE = determineFairPE(fundamentals.getSector());
+            double suggestedCeiling = fundamentals.getTrailingEps() * fairPE;
+            sb.append(String.format("\nPRECO TETO SUGERIDO: R$ %.2f (LPA %.2f x P/L justo %.0f)\n",
+                    suggestedCeiling, fundamentals.getTrailingEps(), fairPE));
+        }
+
+        return sb.toString();
+    }
+
+    /**
+     * Determina o P/L justo baseado no setor
+     */
+    private double determineFairPE(String sector) {
+        if (sector == null) return 10.0;
+
+        String sectorLower = sector.toLowerCase();
+        if (sectorLower.contains("financial") || sectorLower.contains("bank")) {
+            return 8.0;
+        } else if (sectorLower.contains("utilities") || sectorLower.contains("energy")) {
+            return 12.0;
+        } else if (sectorLower.contains("basic materials") || sectorLower.contains("mining")) {
+            return 6.0;
+        } else if (sectorLower.contains("consumer") || sectorLower.contains("retail")) {
+            return 15.0;
+        } else if (sectorLower.contains("technology")) {
+            return 20.0;
+        }
+        return 10.0;
     }
 
     private void parseAndSaveAssetAnalysis(PortfolioPosition position, String aiResponse) {
@@ -737,7 +884,8 @@ public class RealPortfolioService {
                 }
             }
             String bias = root.has("bias") ? root.get("bias").asText() : null;
-            log.info("Bias parseado: {}", bias);
+            String valuationAnalysis = root.has("valuationAnalysis") ? root.get("valuationAnalysis").asText() : null;
+            log.info("Bias parseado: {}, ValuationAnalysis: {}", bias, valuationAnalysis != null ? "presente" : "ausente");
 
             position.setAiRecommendation(recommendation);
             position.setAiAnalysis(analysis);
@@ -746,6 +894,7 @@ public class RealPortfolioService {
             position.setAiConfidenceScore(confidenceScore);
             position.setAiCeilingPrice(ceilingPrice);
             position.setAiBias(bias);
+            position.setAiValuationAnalysis(valuationAnalysis);
             position.setAiAnalyzedAt(LocalDateTime.now());
 
             positionRepository.save(position);
@@ -833,7 +982,13 @@ public class RealPortfolioService {
                         .aiConfidenceScore(p.getAiConfidenceScore())
                         .aiCeilingPrice(p.getAiCeilingPrice())
                         .aiBias(p.getAiBias())
+                        .aiValuationAnalysis(p.getAiValuationAnalysis())
                         .aiAnalyzedAt(p.getAiAnalyzedAt() != null ? p.getAiAnalyzedAt().toString() : null)
+                        // Dados fundamentalistas do Yahoo Finance
+                        .yahooTrailingPE(p.getYahooTrailingPE())
+                        .yahooPriceToBook(p.getYahooPriceToBook())
+                        .yahooDividendYield(p.getYahooDividendYield())
+                        .yahooSector(p.getYahooSector())
                         .build())
                 .collect(Collectors.toList());
 
