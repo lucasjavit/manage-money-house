@@ -10,6 +10,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
@@ -29,16 +32,30 @@ public class B3ReportService {
     private ObjectMapper objectMapper = new ObjectMapper();
 
     public B3ReportUploadResponse processReport(String base64Content, Long userId) {
+        return processReport(base64Content, userId, null);
+    }
+
+    public B3ReportUploadResponse processReport(String base64Content, Long userId, String fileName) {
         log.info("Processando relatorio B3 para usuario {}", userId);
 
         try {
-            // 1. Decodificar PDF
-            byte[] pdfBytes = Base64.getDecoder().decode(base64Content);
-            log.info("PDF decodificado: {} bytes", pdfBytes.length);
+            // 1. Decodificar arquivo
+            byte[] fileBytes = Base64.getDecoder().decode(base64Content);
+            log.info("Arquivo decodificado: {} bytes", fileBytes.length);
 
-            // 2. Extrair texto do PDF
-            String extractedText = extractTextFromPDF(pdfBytes);
-            log.info("Texto extraido do PDF: {} caracteres", extractedText.length());
+            // 2. Detectar tipo de arquivo e extrair texto
+            String extractedText;
+            String fileType = detectFileType(fileBytes, fileName);
+
+            if ("EXCEL".equals(fileType)) {
+                log.info("Detectado arquivo Excel");
+                extractedText = extractTextFromExcel(fileBytes, fileName);
+            } else {
+                log.info("Detectado arquivo PDF");
+                extractedText = extractTextFromPDF(fileBytes);
+            }
+
+            log.info("Texto extraido: {} caracteres", extractedText.length());
             log.debug("Texto extraido: {}", extractedText.substring(0, Math.min(2000, extractedText.length())));
 
             // 3. Usar IA para parsear os dados
@@ -76,6 +93,94 @@ public class B3ReportService {
             PDFTextStripper stripper = new PDFTextStripper();
             return stripper.getText(document);
         }
+    }
+
+    private String detectFileType(byte[] fileBytes, String fileName) {
+        // Verificar por extensao do arquivo
+        if (fileName != null) {
+            String lowerName = fileName.toLowerCase();
+            if (lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls")) {
+                return "EXCEL";
+            }
+            if (lowerName.endsWith(".pdf")) {
+                return "PDF";
+            }
+        }
+
+        // Verificar por magic bytes
+        if (fileBytes.length >= 4) {
+            // PDF: %PDF
+            if (fileBytes[0] == 0x25 && fileBytes[1] == 0x50 &&
+                fileBytes[2] == 0x44 && fileBytes[3] == 0x46) {
+                return "PDF";
+            }
+            // XLSX (ZIP): PK
+            if (fileBytes[0] == 0x50 && fileBytes[1] == 0x4B) {
+                return "EXCEL";
+            }
+            // XLS (OLE): D0 CF 11 E0
+            if (fileBytes.length >= 8 &&
+                (fileBytes[0] & 0xFF) == 0xD0 && (fileBytes[1] & 0xFF) == 0xCF &&
+                (fileBytes[2] & 0xFF) == 0x11 && (fileBytes[3] & 0xFF) == 0xE0) {
+                return "EXCEL";
+            }
+        }
+
+        // Padrao: PDF
+        return "PDF";
+    }
+
+    private String extractTextFromExcel(byte[] excelBytes, String fileName) throws IOException {
+        StringBuilder text = new StringBuilder();
+
+        try (ByteArrayInputStream inputStream = new ByteArrayInputStream(excelBytes)) {
+            Workbook workbook;
+
+            // Determinar tipo de Excel
+            boolean isXlsx = fileName != null && fileName.toLowerCase().endsWith(".xlsx");
+            if (!isXlsx && fileName != null && fileName.toLowerCase().endsWith(".xls")) {
+                workbook = new HSSFWorkbook(inputStream);
+            } else {
+                // Tentar XLSX primeiro (mais comum)
+                workbook = new XSSFWorkbook(inputStream);
+            }
+
+            try {
+                DataFormatter formatter = new DataFormatter();
+
+                // Iterar por todas as planilhas
+                for (int sheetIndex = 0; sheetIndex < workbook.getNumberOfSheets(); sheetIndex++) {
+                    Sheet sheet = workbook.getSheetAt(sheetIndex);
+                    String sheetName = sheet.getSheetName();
+                    text.append("\n=== PLANILHA: ").append(sheetName).append(" ===\n\n");
+
+                    // Iterar por todas as linhas
+                    for (Row row : sheet) {
+                        StringBuilder rowText = new StringBuilder();
+                        boolean hasContent = false;
+
+                        for (Cell cell : row) {
+                            String cellValue = formatter.formatCellValue(cell).trim();
+                            if (!cellValue.isEmpty()) {
+                                hasContent = true;
+                                if (rowText.length() > 0) {
+                                    rowText.append("\t");
+                                }
+                                rowText.append(cellValue);
+                            }
+                        }
+
+                        if (hasContent) {
+                            text.append(rowText).append("\n");
+                        }
+                    }
+                }
+            } finally {
+                workbook.close();
+            }
+        }
+
+        return text.toString();
     }
 
     private String buildExtractionPrompt(String text) {
@@ -157,7 +262,7 @@ public class B3ReportService {
                 "fixedIncome": 246941.29,
                 "funds": 4734.50,
                 "dividends": 1117.68,
-                "grandTotal": 317133.67
+                "grandTotal": 318151.65
               }
             }
 
@@ -170,7 +275,8 @@ public class B3ReportService {
             6. Converta datas para formato ISO (YYYY-MM-DD)
             7. Use numeros decimais (nao strings) para valores monetarios
             8. Some os totais de cada categoria
-            9. Calcule grandTotal somando todos os ativos (acoes + fiis + fixedIncome + funds)
+            9. Calcule grandTotal somando TODOS os ativos (acoes + fiis + fixedIncome + funds + cash)
+            10. IMPORTANTE: Extraia o valor de "Disponibilidade" ou "Saldo em caixa" e inclua no campo "cash"
 
             TEXTO DO RELATORIO:
             %s

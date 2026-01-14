@@ -30,9 +30,9 @@ public class RealPortfolioController {
         log.info("POST /api/real-portfolio/upload - UserId: {}, FileName: {}",
                 request.getUserId(), request.getFileName());
 
-        // 1. Processar PDF e extrair dados com IA
+        // 1. Processar arquivo (PDF ou Excel) e extrair dados com IA
         B3ReportUploadResponse response = b3ReportService.processReport(
-                request.getFileContent(), request.getUserId());
+                request.getFileContent(), request.getUserId(), request.getFileName());
 
         // Se houve erro na extracao, retornar
         if (response.getErrorMessage() != null) {

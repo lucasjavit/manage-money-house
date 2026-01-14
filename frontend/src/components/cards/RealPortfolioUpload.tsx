@@ -26,8 +26,12 @@ const RealPortfolioUpload: React.FC<Props> = ({ userId, onUploadComplete }) => {
   };
 
   const handleFile = async (file: File) => {
-    if (!file.name.toLowerCase().endsWith('.pdf')) {
-      setError('Por favor, selecione um arquivo PDF.');
+    const fileName = file.name.toLowerCase();
+    const validExtensions = ['.pdf', '.xlsx', '.xls'];
+    const isValidFile = validExtensions.some(ext => fileName.endsWith(ext));
+
+    if (!isValidFile) {
+      setError('Por favor, selecione um arquivo PDF ou Excel (.xlsx, .xls).');
       return;
     }
 
@@ -108,7 +112,7 @@ const RealPortfolioUpload: React.FC<Props> = ({ userId, onUploadComplete }) => {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf"
+          accept=".pdf,.xlsx,.xls,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
           onChange={handleChange}
           className="hidden"
         />
@@ -125,7 +129,7 @@ const RealPortfolioUpload: React.FC<Props> = ({ userId, onUploadComplete }) => {
           </div>
         ) : (
           <>
-            <div className="text-6xl mb-4">📄</div>
+            <div className="text-6xl mb-4">📊</div>
             <h3 className="text-xl font-bold text-gray-800 mb-2">
               Upload do Relatorio B3
             </h3>
@@ -137,7 +141,7 @@ const RealPortfolioUpload: React.FC<Props> = ({ userId, onUploadComplete }) => {
             </p>
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-100 text-purple-700 rounded-lg text-sm">
               <span>📁</span>
-              <span>Apenas arquivos PDF (max 10MB)</span>
+              <span>PDF ou Excel (.xlsx, .xls) - max 10MB</span>
             </div>
           </>
         )}

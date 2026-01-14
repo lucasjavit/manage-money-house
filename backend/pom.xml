@@ -71,6 +71,18 @@
             <version>3.0.1</version>
         </dependency>
 
+        <!-- Excel Processing (Apache POI) -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi</artifactId>
+            <version>5.2.5</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.2.5</version>
+        </dependency>
+
         <!-- Image Processing (OCR would require Tesseract, but for now we'll use basic image handling) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

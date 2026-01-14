@@ -635,6 +635,9 @@ const RealPortfolioCard: React.FC<Props> = ({ portfolio, onNewUpload, onRefresh 
   const renderPositionsTable = (positions: RealPortfolioPosition[], title: string, color: string) => {
     if (positions.length === 0) return null;
 
+    // Calcular total da categoria
+    const categoryTotal = positions.reduce((sum, pos) => sum + (pos.totalValue || 0), 0);
+
     return (
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <button
@@ -642,7 +645,10 @@ const RealPortfolioCard: React.FC<Props> = ({ portfolio, onNewUpload, onRefresh 
           onClick={() => toggleSection(title)}
         >
           <span>{title} ({positions.length})</span>
-          <span>{expandedSection === title ? '−' : '+'}</span>
+          <div className="flex items-center gap-4">
+            <span className="text-white/90 font-bold">{formatCurrency(categoryTotal)}</span>
+            <span>{expandedSection === title ? '−' : '+'}</span>
+          </div>
         </button>
         {expandedSection === title && (
           <div className="overflow-x-auto">
@@ -694,6 +700,9 @@ const RealPortfolioCard: React.FC<Props> = ({ portfolio, onNewUpload, onRefresh 
   const renderDividendsTable = (dividends: RealPortfolioDividend[]) => {
     if (dividends.length === 0) return null;
 
+    // Calcular total de proventos
+    const dividendsTotal = dividends.reduce((sum, div) => sum + (div.netValue || 0), 0);
+
     return (
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <button
@@ -701,7 +710,10 @@ const RealPortfolioCard: React.FC<Props> = ({ portfolio, onNewUpload, onRefresh 
           onClick={() => toggleSection('dividends')}
         >
           <span>Proventos Recebidos ({dividends.length})</span>
-          <span>{expandedSection === 'dividends' ? '−' : '+'}</span>
+          <div className="flex items-center gap-4">
+            <span className="text-white/90 font-bold">{formatCurrency(dividendsTotal)}</span>
+            <span>{expandedSection === 'dividends' ? '−' : '+'}</span>
+          </div>
         </button>
         {expandedSection === 'dividends' && (
           <div className="overflow-x-auto">
