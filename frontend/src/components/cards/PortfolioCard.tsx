@@ -9,6 +9,7 @@ interface PortfolioCardProps {
 
 const PortfolioCard: React.FC<PortfolioCardProps> = ({ portfolio }) => {
   const [selectedAsset, setSelectedAsset] = useState<RecommendedAsset | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
 
   // DY visível apenas para carteiras focadas em dividendos/valor
   const showDY =
@@ -51,6 +52,51 @@ const PortfolioCard: React.FC<PortfolioCardProps> = ({ portfolio }) => {
 
       <p className="text-sm text-gray-700 mb-4">{portfolio.description}</p>
 
+      {/* Toggle para mostrar Estratégia e Características */}
+      {(portfolio.strategy || (portfolio.characteristics && portfolio.characteristics.length > 0)) && (
+        <button
+          onClick={() => setShowDetails(!showDetails)}
+          className="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 mb-4 transition-colors"
+        >
+          <svg
+            className={`w-4 h-4 transition-transform ${showDetails ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+          <span>{showDetails ? 'Ocultar detalhes' : 'Ver estratégia e características'}</span>
+        </button>
+      )}
+
+      {/* Seção colapsável: Estratégia e Características */}
+      {showDetails && (
+        <div className="mb-4 bg-white/50 rounded-lg p-4 border border-indigo-100">
+          {portfolio.strategy && (
+            <div className="mb-3">
+              <h4 className="text-sm font-semibold text-gray-800 mb-1">Estratégia:</h4>
+              <p className="text-sm text-gray-600">{portfolio.strategy}</p>
+            </div>
+          )}
+          {portfolio.characteristics && portfolio.characteristics.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-gray-800 mb-2">Características:</h4>
+              <div className="flex flex-wrap gap-2">
+                {portfolio.characteristics.map((char, idx) => (
+                  <span
+                    key={idx}
+                    className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium"
+                  >
+                    {char}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="mb-4">
         <h4 className="text-sm font-semibold text-gray-800 mb-2">
           Composição Sugerida:
@@ -74,59 +120,6 @@ const PortfolioCard: React.FC<PortfolioCardProps> = ({ portfolio }) => {
           ))}
         </div>
       </div>
-
-      <div className="mb-4">
-        <h4 className="text-sm font-semibold text-gray-800 mb-2">Estratégia:</h4>
-        <p className="text-xs text-gray-600">{portfolio.strategy}</p>
-      </div>
-
-      <div>
-        <h4 className="text-sm font-semibold text-gray-800 mb-2">
-          Características:
-        </h4>
-        <ul className="text-xs text-gray-600 space-y-1">
-          {portfolio.characteristics.map((char, idx) => (
-            <li key={idx}>• {char}</li>
-          ))}
-        </ul>
-      </div>
-
-      {/* Seção Explicativa: Por que esses ativos? */}
-      {recommendedAssets.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-indigo-200">
-          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-4 mb-4">
-            <h4 className="text-sm font-bold text-indigo-800 mb-2 flex items-center gap-2">
-              <span className="text-lg">💡</span>
-              Por que escolhemos esses ativos?
-            </h4>
-            <p className="text-xs text-gray-600 mb-3">
-              Cada ativo foi selecionado com base em análise fundamentalista.
-              Passe o mouse no ícone <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-indigo-200 text-indigo-600 text-xs mx-1">ℹ</span>
-              na coluna "Análise" para ver o motivo específico de cada escolha.
-            </p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-              <div className="bg-white rounded-lg p-2 text-center">
-                <span className="block text-indigo-600 font-bold text-lg">{recommendedAssets.length}</span>
-                <span className="text-gray-500">Ativos</span>
-              </div>
-              <div className="bg-white rounded-lg p-2 text-center">
-                <span className="block text-green-600 font-bold text-lg">{goodPriceAssets.length}</span>
-                <span className="text-gray-500">Bom Preço</span>
-              </div>
-              <div className="bg-white rounded-lg p-2 text-center">
-                <span className="block text-orange-600 font-bold text-lg">{aboveCeilingAssets.length}</span>
-                <span className="text-gray-500">Aguardar</span>
-              </div>
-              <div className="bg-white rounded-lg p-2 text-center">
-                <span className="block text-purple-600 font-bold text-lg">
-                  {new Set(recommendedAssets.map(a => a.type)).size}
-                </span>
-                <span className="text-gray-500">Tipos</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Ativos com Bom Preço (Comprar) */}
       {goodPriceAssets.length > 0 && (

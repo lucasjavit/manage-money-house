@@ -131,11 +131,27 @@ const InvestmentPage = () => {
     }
   };
 
-  const handleRunReview = async () => {
+  // Abre o modal e carrega as analises existentes (ultima analise salva)
+  const handleOpenReviewModal = async () => {
     setShowReviewModal(true);
     setIsRunningReview(true);
+    setReviewStatus('Carregando analises...');
+
+    try {
+      await loadExistingAnalyses();
+      setReviewStatus('');
+    } catch (err) {
+      console.error('Error loading analyses:', err);
+      setReviewStatus('Erro ao carregar analises.');
+    } finally {
+      setIsRunningReview(false);
+    }
+  };
+
+  // Executa nova analise (chamado pelo botao dentro do modal)
+  const handleRunReview = async () => {
+    setIsRunningReview(true);
     setReviewStatus('Iniciando analise de todas as carteiras...');
-    setReviewAnalyses([]);
 
     try {
       const result = await portfolioReviewService.runFullReview();
@@ -150,20 +166,9 @@ const InvestmentPage = () => {
     }
   };
 
+  // Mantido para compatibilidade com botao "Ver Analises"
   const handleViewAnalyses = async () => {
-    setShowReviewModal(true);
-    setIsRunningReview(true);
-    setReviewStatus('Carregando analises...');
-
-    try {
-      await loadExistingAnalyses();
-      setReviewStatus('');
-    } catch (err) {
-      console.error('Error loading analyses:', err);
-      setReviewStatus('Erro ao carregar analises.');
-    } finally {
-      setIsRunningReview(false);
-    }
+    await handleOpenReviewModal();
   };
 
   const handleTabClick = (tabId: string) => {
@@ -305,13 +310,13 @@ const InvestmentPage = () => {
               <span className="hidden sm:inline">Ver Analises</span>
             </button>
             <button
-              onClick={handleRunReview}
+              onClick={handleOpenReviewModal}
               disabled={lastReviewStatus?.isRunning}
               className="px-3 py-2 text-sm bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-700 hover:to-purple-700 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
-              title="Rodar analise de IA em todas as carteiras"
+              title="Abrir painel de analise IA"
             >
               <span>🤖</span>
-              <span className="hidden sm:inline">Rodar Analise IA</span>
+              <span className="hidden sm:inline">Analise IA</span>
             </button>
           </div>
           <button
@@ -508,15 +513,7 @@ const InvestmentPage = () => {
             {isLoading && renderLoading()}
             {error && !isLoading && renderError()}
             {portfolio && !isLoading && (
-              <>
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <p className="text-yellow-800 text-sm">
-                    <strong>⚠️ Atenção:</strong> Estas são sugestões educacionais baseadas em análise fundamentalista.
-                    Consulte um profissional antes de investir. Rentabilidade passada não garante retornos futuros.
-                  </p>
-                </div>
-                <PortfolioCard portfolio={portfolio} />
-              </>
+              <PortfolioCard portfolio={portfolio} />
             )}
             {!portfolio && !isLoading && !error && (
               <div className="text-center py-10 text-gray-500">
@@ -532,6 +529,7 @@ const InvestmentPage = () => {
         <PortfolioReviewModal
           analyses={reviewAnalyses}
           onClose={() => setShowReviewModal(false)}
+          onReload={handleRunReview}
           isLoading={isRunningReview}
           status={reviewStatus}
         />

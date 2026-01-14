@@ -1,9 +1,17 @@
 package com.managehouse.money.config;
 
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
+import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.servlet.resource.PathResourceResolver;
+
+import java.io.File;
+import java.io.IOException;
 
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
@@ -19,11 +27,46 @@ public class WebConfig implements WebMvcConfigurer {
     }
 
     @Override
+    public void addViewControllers(ViewControllerRegistry registry) {
+        // Redirecionar a raiz para index.html
+        registry.addViewController("/").setViewName("forward:/index.html");
+    }
+
+    @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // Serve static files from /app/static
+        // Serve static files from /app/static with SPA fallback
         registry.addResourceHandler("/**")
                 .addResourceLocations("file:/app/static/", "classpath:/static/", "classpath:/public/")
-                .setCachePeriod(0);
+                .setCachePeriod(0)
+                .resourceChain(true)
+                .addResolver(new PathResourceResolver() {
+                    @Override
+                    protected Resource getResource(String resourcePath, Resource location) throws IOException {
+                        Resource requestedResource = location.createRelative(resourcePath);
+
+                        // Se o recurso existe, retorná-lo
+                        if (requestedResource.exists() && requestedResource.isReadable()) {
+                            return requestedResource;
+                        }
+
+                        // Se não existe e não é uma requisição de API/asset, retornar index.html (SPA)
+                        if (!resourcePath.startsWith("api/") && !resourcePath.startsWith("actuator/") &&
+                            !resourcePath.contains(".")) {
+                            // Tentar arquivo em /app/static (produção)
+                            File indexFile = new File("/app/static/index.html");
+                            if (indexFile.exists()) {
+                                return new FileSystemResource(indexFile);
+                            }
+                            // Fallback para classpath
+                            Resource indexResource = new ClassPathResource("static/index.html");
+                            if (indexResource.exists()) {
+                                return indexResource;
+                            }
+                        }
+
+                        return null;
+                    }
+                });
     }
 }
 

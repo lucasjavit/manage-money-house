@@ -261,50 +261,7 @@ public class MarketDataController {
                 ))
                 .build());
 
-        // 3. Carteira de Renda Fixa
-        portfolios.add(InvestmentPortfolio.builder()
-                .name("Carteira de Renda Fixa")
-                .description("Focada em preservação de capital e previsibilidade de retornos através de títulos públicos e privados de baixo risco.")
-                .strategy("Preservação de capital, diversificação de vencimentos, aproveitamento de juros compostos")
-                .riskLevel("Baixo")
-                .icon("🏦")
-                .suggestedComposition(Arrays.asList(
-                        PortfolioAsset.builder().type("Tesouro").percentage(50).description("Tesouro Selic e IPCA+").build(),
-                        PortfolioAsset.builder().type("CDBs").percentage(30).description("CDBs com garantia do FGC").build(),
-                        PortfolioAsset.builder().type("LCI/LCA").percentage(20).description("Isentos de IR").build()
-                ))
-                .recommendedAssets(Arrays.asList(
-                        RecommendedAsset.builder().rank(1)
-                                .ticker("SELIC-2029").name("Tesouro Selic 2029").type("Renda Fixa")
-                                .expectedDY(null).entryPrice(null).ceilingPrice(null).targetAllocation(30.0)
-                                .rationale("Liquidez diária, pós-fixado ~13% a.a., risco soberano, reserva emergência").build(),
-                        RecommendedAsset.builder().rank(2)
-                                .ticker("IPCA+2035").name("Tesouro IPCA+ 2035").type("Renda Fixa")
-                                .expectedDY(null).entryPrice(null).ceilingPrice(null).targetAllocation(25.0)
-                                .rationale("Proteção inflação, IPCA + 6% a.a., médio prazo, risco soberano").build(),
-                        RecommendedAsset.builder().rank(3)
-                                .ticker("CDB-110CDI").name("CDB 110% CDI").type("Renda Fixa")
-                                .expectedDY(null).entryPrice(null).ceilingPrice(null).targetAllocation(20.0)
-                                .rationale("Rentabilidade CDI+10%, garantia FGC R$250k, bancos grandes").build(),
-                        RecommendedAsset.builder().rank(4)
-                                .ticker("LCI-95CDI").name("LCI 95% CDI").type("Renda Fixa")
-                                .expectedDY(null).entryPrice(null).ceilingPrice(null).targetAllocation(15.0)
-                                .rationale("Isento IR (líquido ~108% CDI), garantia FGC, lastro imobiliário").build(),
-                        RecommendedAsset.builder().rank(5)
-                                .ticker("DEB-INFRA").name("Debênture Infra AAA").type("Renda Fixa")
-                                .expectedDY(null).entryPrice(null).ceilingPrice(null).targetAllocation(10.0)
-                                .rationale("Isento IR, rating AAA, IPCA + 6%, projetos infraestrutura").build()
-                ))
-                .characteristics(Arrays.asList(
-                        "Baixíssimo risco",
-                        "Liquidez diária (Tesouro Selic)",
-                        "Proteção contra inflação (IPCA+)",
-                        "Garantia do FGC até R$ 250k",
-                        "Ideal para reserva de emergência"
-                ))
-                .build());
-
-        // 4. Carteira Internacional
+        // 3. Carteira Internacional
         portfolios.add(InvestmentPortfolio.builder()
                 .name("Carteira Internacional")
                 .description("Diversificação geográfica através de ETFs e ações americanas, com exposição ao dólar e economia global.")
@@ -351,7 +308,7 @@ public class MarketDataController {
                 ))
                 .build());
 
-        // 5. Carteira Small Caps
+        // 4. Carteira Small Caps
         portfolios.add(InvestmentPortfolio.builder()
                 .name("Carteira Small Caps")
                 .description("Foco em empresas de menor capitalização com alto potencial de crescimento, adequada para perfil agressivo e horizonte longo.")
@@ -411,6 +368,49 @@ public class MarketDataController {
                         "Requer análise detalhada",
                         "Menor liquidez que blue chips",
                         "Horizonte de longo prazo obrigatório"
+                ))
+                .build());
+
+        // 5. Carteira de Renda Fixa
+        portfolios.add(InvestmentPortfolio.builder()
+                .name("Carteira de Renda Fixa")
+                .description("Focada em preservação de capital e previsibilidade de retornos através de títulos públicos e privados de baixo risco.")
+                .strategy("Preservação de capital, diversificação de vencimentos, aproveitamento de juros compostos")
+                .riskLevel("Baixo")
+                .icon("🏦")
+                .suggestedComposition(Arrays.asList(
+                        PortfolioAsset.builder().type("Tesouro").percentage(50).description("Tesouro Selic e IPCA+").build(),
+                        PortfolioAsset.builder().type("CDBs").percentage(30).description("CDBs com garantia do FGC").build(),
+                        PortfolioAsset.builder().type("LCI/LCA").percentage(20).description("Isentos de IR").build()
+                ))
+                .recommendedAssets(Arrays.asList(
+                        RecommendedAsset.builder().rank(1)
+                                .ticker("SELIC-2029").name("Tesouro Selic 2029").type("Renda Fixa")
+                                .expectedDY(null).entryPrice(null).ceilingPrice(null).targetAllocation(30.0)
+                                .rationale("Liquidez diária, pós-fixado ~13% a.a., risco soberano, reserva emergência").build(),
+                        RecommendedAsset.builder().rank(2)
+                                .ticker("IPCA+2035").name("Tesouro IPCA+ 2035").type("Renda Fixa")
+                                .expectedDY(null).entryPrice(null).ceilingPrice(null).targetAllocation(25.0)
+                                .rationale("Proteção inflação, IPCA + 6% a.a., médio prazo, risco soberano").build(),
+                        RecommendedAsset.builder().rank(3)
+                                .ticker("CDB-110CDI").name("CDB 110% CDI").type("Renda Fixa")
+                                .expectedDY(null).entryPrice(null).ceilingPrice(null).targetAllocation(20.0)
+                                .rationale("Rentabilidade CDI+10%, garantia FGC R$250k, bancos grandes").build(),
+                        RecommendedAsset.builder().rank(4)
+                                .ticker("LCI-95CDI").name("LCI 95% CDI").type("Renda Fixa")
+                                .expectedDY(null).entryPrice(null).ceilingPrice(null).targetAllocation(15.0)
+                                .rationale("Isento IR (líquido ~108% CDI), garantia FGC, lastro imobiliário").build(),
+                        RecommendedAsset.builder().rank(5)
+                                .ticker("DEB-INFRA").name("Debênture Infra AAA").type("Renda Fixa")
+                                .expectedDY(null).entryPrice(null).ceilingPrice(null).targetAllocation(10.0)
+                                .rationale("Isento IR, rating AAA, IPCA + 6%, projetos infraestrutura").build()
+                ))
+                .characteristics(Arrays.asList(
+                        "Baixíssimo risco",
+                        "Liquidez diária (Tesouro Selic)",
+                        "Proteção contra inflação (IPCA+)",
+                        "Garantia do FGC até R$ 250k",
+                        "Ideal para reserva de emergência"
                 ))
                 .build());
 

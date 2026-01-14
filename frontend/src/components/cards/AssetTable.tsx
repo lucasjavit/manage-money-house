@@ -226,6 +226,122 @@ const BiasCell: React.FC<BiasCellProps> = ({ asset }) => {
   );
 };
 
+// Tooltip simples para "Clique para ver análise"
+interface ClickTooltipProps {
+  anchorRef: React.RefObject<HTMLElement | null>;
+  isVisible: boolean;
+}
+
+const ClickTooltipPortal: React.FC<ClickTooltipProps> = ({ anchorRef, isVisible }) => {
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    if (anchorRef.current && isVisible) {
+      const rect = anchorRef.current.getBoundingClientRect();
+      setCoords({
+        top: rect.top - 36,
+        left: rect.left + rect.width / 2,
+      });
+    }
+  }, [anchorRef, isVisible]);
+
+  if (!isVisible) return null;
+
+  return ReactDOM.createPortal(
+    <div
+      className="fixed z-[9999] px-3 py-1.5 bg-gray-800 text-white text-xs font-medium rounded-lg shadow-lg whitespace-nowrap -translate-x-1/2 pointer-events-none"
+      style={{ top: coords.top, left: coords.left }}
+    >
+      Clique para ver análise
+      <div className="absolute left-1/2 -translate-x-1/2 -bottom-1 w-2 h-2 bg-gray-800 rotate-45" />
+    </div>,
+    document.body
+  );
+};
+
+// Linha da tabela com tooltip
+interface AssetRowProps {
+  asset: RecommendedAsset;
+  showDY: boolean;
+  formatCurrency: (value: number | null | undefined) => string;
+  formatDY: (value: number | null | undefined) => string;
+  onAssetSelect?: (asset: RecommendedAsset) => void;
+}
+
+const AssetRow: React.FC<AssetRowProps> = ({ asset, showDY, formatCurrency, formatDY, onAssetSelect }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const rowRef = useRef<HTMLTableRowElement>(null);
+
+  return (
+    <tr
+      ref={rowRef}
+      onClick={() => onAssetSelect?.(asset)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className="hover:bg-indigo-50 transition-colors cursor-pointer"
+    >
+      <td className="px-3 py-3 text-sm text-gray-500 font-medium">
+        {asset.rank}
+      </td>
+      <td className="px-3 py-3">
+        <div className="font-bold text-gray-900">{asset.ticker}</div>
+        <div className="text-xs text-gray-500">{asset.name}</div>
+      </td>
+      <td className="px-3 py-3 text-sm text-gray-600">
+        {asset.type}
+      </td>
+      {showDY && (
+        <td className="px-3 py-3 text-center text-sm text-gray-700">
+          {formatDY(asset.expectedDY)}
+        </td>
+      )}
+      <td className="px-3 py-3 text-right text-sm font-medium text-gray-900">
+        {formatCurrency(asset.currentPrice)}
+      </td>
+      <td className="px-3 py-3 text-right text-sm text-gray-700">
+        {formatCurrency(asset.ceilingPrice)}
+      </td>
+      <td className="px-3 py-3 text-center text-sm font-semibold text-indigo-600">
+        {asset.targetAllocation}%
+      </td>
+      <BiasCell asset={asset} />
+      <ClickTooltipPortal anchorRef={rowRef} isVisible={isHovered} />
+    </tr>
+  );
+};
+
+// Linha simplificada para Renda Fixa
+const FixedIncomeRow: React.FC<{ asset: RecommendedAsset; onAssetSelect?: (asset: RecommendedAsset) => void }> = ({ asset, onAssetSelect }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const rowRef = useRef<HTMLTableRowElement>(null);
+
+  return (
+    <tr
+      ref={rowRef}
+      onClick={() => onAssetSelect?.(asset)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className="hover:bg-indigo-50 transition-colors cursor-pointer"
+    >
+      <td className="px-3 py-3 text-sm text-gray-500 font-medium">
+        {asset.rank}
+      </td>
+      <td className="px-3 py-3">
+        <div className="font-bold text-gray-900">{asset.ticker}</div>
+        <div className="text-xs text-gray-500">{asset.name}</div>
+      </td>
+      <td className="px-3 py-3 text-sm text-gray-600">
+        {asset.type}
+      </td>
+      <td className="px-3 py-3 text-center text-sm font-semibold text-indigo-600">
+        {asset.targetAllocation}%
+      </td>
+      <BiasCell asset={asset} />
+      <ClickTooltipPortal anchorRef={rowRef} isVisible={isHovered} />
+    </tr>
+  );
+};
+
 const AssetTable = ({ assets, showDY = false, isFixedIncome = false, onAssetSelect }: AssetTableProps) => {
   const formatCurrency = (value: number | null | undefined) => {
     if (value === null || value === undefined) return '-';
@@ -268,26 +384,7 @@ const AssetTable = ({ assets, showDY = false, isFixedIncome = false, onAssetSele
           </thead>
           <tbody className="divide-y divide-gray-100 bg-white">
             {assets.map((asset) => (
-              <tr
-                key={asset.ticker}
-                onClick={() => onAssetSelect?.(asset)}
-                className="hover:bg-indigo-50 transition-colors cursor-pointer"
-              >
-                <td className="px-3 py-3 text-sm text-gray-500 font-medium">
-                  {asset.rank}
-                </td>
-                <td className="px-3 py-3">
-                  <div className="font-bold text-gray-900">{asset.ticker}</div>
-                  <div className="text-xs text-gray-500">{asset.name}</div>
-                </td>
-                <td className="px-3 py-3 text-sm text-gray-600">
-                  {asset.type}
-                </td>
-                <td className="px-3 py-3 text-center text-sm font-semibold text-indigo-600">
-                  {asset.targetAllocation}%
-                </td>
-                <BiasCell asset={asset} />
-              </tr>
+              <FixedIncomeRow key={asset.ticker} asset={asset} onAssetSelect={onAssetSelect} />
             ))}
           </tbody>
         </table>
@@ -331,37 +428,14 @@ const AssetTable = ({ assets, showDY = false, isFixedIncome = false, onAssetSele
         </thead>
         <tbody className="divide-y divide-gray-100 bg-white">
           {assets.map((asset) => (
-            <tr
+            <AssetRow
               key={asset.ticker}
-              onClick={() => onAssetSelect?.(asset)}
-              className="hover:bg-indigo-50 transition-colors cursor-pointer"
-            >
-              <td className="px-3 py-3 text-sm text-gray-500 font-medium">
-                {asset.rank}
-              </td>
-              <td className="px-3 py-3">
-                <div className="font-bold text-gray-900">{asset.ticker}</div>
-                <div className="text-xs text-gray-500">{asset.name}</div>
-              </td>
-              <td className="px-3 py-3 text-sm text-gray-600">
-                {asset.type}
-              </td>
-              {showDY && (
-                <td className="px-3 py-3 text-center text-sm text-gray-700">
-                  {formatDY(asset.expectedDY)}
-                </td>
-              )}
-              <td className="px-3 py-3 text-right text-sm font-medium text-gray-900">
-                {formatCurrency(asset.currentPrice)}
-              </td>
-              <td className="px-3 py-3 text-right text-sm text-gray-700">
-                {formatCurrency(asset.ceilingPrice)}
-              </td>
-              <td className="px-3 py-3 text-center text-sm font-semibold text-indigo-600">
-                {asset.targetAllocation}%
-              </td>
-              <BiasCell asset={asset} />
-            </tr>
+              asset={asset}
+              showDY={showDY}
+              formatCurrency={formatCurrency}
+              formatDY={formatDY}
+              onAssetSelect={onAssetSelect}
+            />
           ))}
         </tbody>
       </table>
