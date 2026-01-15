@@ -286,11 +286,18 @@ public class SalaryService {
         );
 
         // Calcular dívida do Lucas (se for o Lucas)
+        // A dívida é baseada no mês ANTERIOR (usa primeiro, paga depois)
         BigDecimal lucasDebt = BigDecimal.ZERO;
         User user = userService.findById(request.getUserId()).orElse(null);
         if (user != null && "vyeiralucas@gmail.com".equals(user.getEmail())) {
-            // Calcular dívida do Lucas para o mês/ano
-            lucasDebt = expenseService.calculateLucasDebt(request.getYear(), request.getMonth());
+            // Calcular dívida do Lucas para o mês ANTERIOR
+            int debtMonth = request.getMonth() - 1;
+            int debtYear = request.getYear();
+            if (debtMonth < 1) {
+                debtMonth = 12;
+                debtYear = debtYear - 1;
+            }
+            lucasDebt = expenseService.calculateLucasDebt(debtYear, debtMonth);
             // Se lucasDebt > 0, Lucas deve para Mariana (descontar)
             // Se lucasDebt < 0, Mariana deve para Lucas (não descontar, mas pode mostrar)
             // Se lucasDebt = 0, estão quites
@@ -372,12 +379,19 @@ public class SalaryService {
         }
 
         // Calcular dívida total do Lucas (se for o Lucas)
+        // A dívida é baseada no mês ANTERIOR (usa primeiro, paga depois)
         BigDecimal totalLucasDebt = BigDecimal.ZERO;
         User user = userService.findById(userId).orElse(null);
         if (user != null && "vyeiralucas@gmail.com".equals(user.getEmail())) {
-            // Calcular dívida do Lucas para cada mês do ano
+            // Calcular dívida do Lucas para cada mês do ano (usando mês anterior)
             for (int month = 1; month <= 12; month++) {
-                BigDecimal monthDebt = expenseService.calculateLucasDebt(year, month);
+                int debtMonth = month - 1;
+                int debtYear = year;
+                if (debtMonth < 1) {
+                    debtMonth = 12;
+                    debtYear = debtYear - 1;
+                }
+                BigDecimal monthDebt = expenseService.calculateLucasDebt(debtYear, debtMonth);
                 if (monthDebt.compareTo(BigDecimal.ZERO) > 0) {
                     // Lucas deve para Mariana, somar ao total
                     totalLucasDebt = totalLucasDebt.add(monthDebt);
