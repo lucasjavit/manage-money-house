@@ -94,66 +94,26 @@ public class RecurringExpenseService {
         // Obter o último mês completo (mês da data de fim)
         YearMonth endMonth = YearMonth.from(end);
 
-        // Gerar expenses para cada mês do período
+        // Cada mês do período ganha um lançamento próprio da recorrente, convivendo
+        // com os lançamentos manuais da mesma célula em vez de somar-se a eles.
         YearMonth current = startMonth;
         while (!current.isAfter(endMonth)) {
-            // Verificar se já existe uma expense para este usuário, mês/ano/tipo
-            Expense existingExpense = expenseRepository
-                    .findByYearAndMonthAndExpenseTypeAndUser(
-                            current.getYear(),
-                            current.getMonthValue(),
-                            recurringExpense.getExpenseType().getId(),
-                            recurringExpense.getUser().getId()
-                    )
-                    .orElse(null);
+            Expense expense = new Expense();
+            expense.setUser(recurringExpense.getUser());
+            expense.setExpenseType(recurringExpense.getExpenseType());
+            expense.setAmount(recurringExpense.getMonthlyAmount());
+            expense.setMonth(current.getMonthValue());
+            expense.setYear(current.getYear());
+            expense.setRecurringExpense(recurringExpense);
+            expenseRepository.save(expense);
 
-            if (existingExpense != null) {
-                // Se já existe, somar o valor mensal
-                existingExpense.setAmount(existingExpense.getAmount().add(recurringExpense.getMonthlyAmount()));
-                existingExpense.setRecurringExpense(recurringExpense);
-                expenseRepository.save(existingExpense);
-            } else {
-                // Se não existe, criar nova
-                Expense expense = new Expense();
-                expense.setUser(recurringExpense.getUser());
-                expense.setExpenseType(recurringExpense.getExpenseType());
-                expense.setAmount(recurringExpense.getMonthlyAmount());
-                expense.setMonth(current.getMonthValue());
-                expense.setYear(current.getYear());
-                expense.setRecurringExpense(recurringExpense);
-                expenseRepository.save(expense);
-            }
-
-            // Avançar para o próximo mês
             current = current.plusMonths(1);
         }
     }
 
     private void deleteExpensesForRecurringExpense(Long recurringExpenseId) {
-        RecurringExpense recurringExpense = recurringExpenseRepository.findById(recurringExpenseId)
-                .orElse(null);
-        
-        if (recurringExpense == null) {
-            return;
-        }
-
-        List<Expense> expenses = expenseRepository.findAll().stream()
-                .filter(e -> e.getRecurringExpense() != null && 
-                           e.getRecurringExpense().getId().equals(recurringExpenseId))
-                .collect(Collectors.toList());
-
-        // Para cada expense, verificar se precisa ser removida ou apenas subtraída
-        for (Expense expense : expenses) {
-            // Se o valor da expense é igual ao valor mensal, remover completamente
-            if (expense.getAmount().compareTo(recurringExpense.getMonthlyAmount()) == 0) {
-                expenseRepository.delete(expense);
-            } else {
-                // Caso contrário, subtrair o valor mensal
-                expense.setAmount(expense.getAmount().subtract(recurringExpense.getMonthlyAmount()));
-                expense.setRecurringExpense(null);
-                expenseRepository.save(expense);
-            }
-        }
+        // Os lançamentos da recorrente são só dela: remove todos, sem tocar nos manuais.
+        expenseRepository.deleteAll(expenseRepository.findByRecurringExpenseId(recurringExpenseId));
     }
 
     public List<RecurringExpenseResponse> getAllRecurringExpenses() {

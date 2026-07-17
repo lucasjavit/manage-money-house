@@ -22,6 +22,7 @@ export interface Expense {
   amount: number;
   month: number;
   year: number;
+  description?: string | null;
   recurringExpenseId?: number | null;
   createdAt: string;
 }
@@ -48,11 +49,14 @@ export interface RecurringExpenseRequest {
 }
 
 export interface ExpenseRequest {
+  // Sem id cria um novo lançamento; com id edita o existente.
+  id?: number;
   userId: number;
   expenseTypeId: number;
   amount: number;
   month: number;
   year: number;
+  description?: string | null;
 }
 
 export interface ApiResponse<T> {

@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { expenseService } from '../services/expenseService';
 import { recurringExpenseService } from '../services/recurringExpenseService';
 import { aiService } from '../services/aiService';
 import type { Expense, ExpenseRequest, ExpenseType, ExpenseAlertsResponse, AIMonthlyAnalysis } from '../types';
 import RecurringExpenseButton from './RecurringExpenseButton';
+import ExpenseModal from './ExpenseModal';
+import ConfirmModal from './ConfirmModal';
 import HealthScoreGauge from './charts/HealthScoreGauge';
 import SpendingTrendChart from './charts/SpendingTrendChart';
 import InflationComparisonChart from './charts/InflationComparisonChart';
@@ -18,11 +20,15 @@ const ExpenseSheet = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [expenseTypes, setExpenseTypes] = useState<ExpenseType[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingCell, setEditingCell] = useState<{
+  const [modalCell, setModalCell] = useState<{
     month: number;
     expenseTypeId: number;
   } | null>(null);
-  const [editValue, setEditValue] = useState<string>('');
+  const [confirmDelete, setConfirmDelete] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
@@ -35,7 +41,6 @@ const ExpenseSheet = () => {
   const [aiAnalysis, setAiAnalysis] = useState<AIMonthlyAnalysis | null>(null);
   const [loadingAiAnalysis, setLoadingAiAnalysis] = useState(false);
   const [showAiAnalysisModal, setShowAiAnalysisModal] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const monthNames = [
     'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
@@ -43,7 +48,7 @@ const ExpenseSheet = () => {
   ];
 
   useEffect(() => {
-    loadData();
+    loadData(true);
     // Carregar meses pagos do localStorage
     const savedPaidMonths = localStorage.getItem(`paidMonths_${year}`);
     if (savedPaidMonths) {
@@ -68,8 +73,10 @@ const ExpenseSheet = () => {
     }
   }, [selectedMonth, year, user]);
 
-  const loadData = async () => {
-    setLoading(true);
+  // showSpinner só no carregamento inicial: nas recargas a tabela permanece montada,
+  // preservando o scroll de quem estava olhando uma célula distante.
+  const loadData = async (showSpinner = false) => {
+    if (showSpinner) setLoading(true);
     try {
       const [expensesData, typesData] = await Promise.all([
         expenseService.getExpenses(year),
@@ -80,7 +87,7 @@ const ExpenseSheet = () => {
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   };
 
@@ -218,21 +225,24 @@ const ExpenseSheet = () => {
     }
   };
 
-  const getCellValue = (month: number, expenseTypeId: number): number => {
-    const expense = expenses.find(
-      (e) => e.month === month && e.expenseTypeId === expenseTypeId
-    );
-    return expense ? expense.amount : 0;
-  };
+  const getCellExpenses = (month: number, expenseTypeId: number): Expense[] =>
+    expenses.filter((e) => e.month === month && e.expenseTypeId === expenseTypeId);
+
+  const getCellValue = (month: number, expenseTypeId: number): number =>
+    getCellExpenses(month, expenseTypeId).reduce((sum, e) => sum + e.amount, 0);
 
   const getCellColor = (month: number, expenseTypeId: number): string => {
-    const expense = expenses.find(
-      (e) => e.month === month && e.expenseTypeId === expenseTypeId
-    );
-    if (!expense) return 'bg-white hover:bg-slate-50/50 border-slate-200/60';
-    
-    return expense.userColor === 'blue' 
-      ? 'bg-blue-50/80 border-blue-300/60 hover:bg-blue-100/80 hover:border-blue-400/80' 
+    const cellExpenses = getCellExpenses(month, expenseTypeId);
+    if (cellExpenses.length === 0) return 'bg-white hover:bg-slate-50/50 border-slate-200/60';
+
+    const colors = new Set(cellExpenses.map((e) => e.userColor));
+    // Lançamentos de donos diferentes na mesma célula: cor neutra.
+    if (colors.size > 1) {
+      return 'bg-slate-100/80 border-slate-300/60 hover:bg-slate-200/80 hover:border-slate-400/80';
+    }
+
+    return colors.has('blue')
+      ? 'bg-blue-50/80 border-blue-300/60 hover:bg-blue-100/80 hover:border-blue-400/80'
       : 'bg-pink-50/80 border-pink-300/60 hover:bg-pink-100/80 hover:border-pink-400/80';
   };
 
@@ -254,31 +264,38 @@ const ExpenseSheet = () => {
       return;
     }
     
-    // Se não estiver em modo de seleção, edita normalmente
-    const value = getCellValue(month, expenseTypeId);
-    setEditingCell({ month, expenseTypeId });
-    setEditValue(value > 0 ? value.toString() : '');
-    setTimeout(() => inputRef.current?.focus(), 0);
+    // Fora do modo de seleção, abre o modal de lançamentos da célula
+    setModalCell({ month, expenseTypeId });
   };
 
-  const handleDeleteSelected = async () => {
+  const handleDeleteSelected = () => {
     if (selectedCells.size === 0) return;
-    
-    if (!confirm(`Deseja excluir ${selectedCells.size} despesa(s) selecionada(s)?`)) {
-      return;
-    }
 
+    const total = Array.from(selectedCells).reduce((sum, cellKey) => {
+      const [month, expenseTypeId] = cellKey.split('-').map(Number);
+      return sum + getCellExpenses(month, expenseTypeId).length;
+    }, 0);
+
+    setConfirmDelete({
+      title: `Excluir ${selectedCells.size} célula(s)?`,
+      message: `${total} lançamento(s) serão excluídos.`,
+      onConfirm: () => {
+        setConfirmDelete(null);
+        void runDeleteSelected();
+      },
+    });
+  };
+
+  const runDeleteSelected = async () => {
     try {
       const deletePromises: Promise<void>[] = [];
       
       selectedCells.forEach((cellKey) => {
         const [month, expenseTypeId] = cellKey.split('-').map(Number);
-        const expense = expenses.find(
-          (e) => e.month === month && e.expenseTypeId === expenseTypeId
-        );
-        if (expense) {
+        // Uma célula pode ter vários lançamentos: exclui todos.
+        getCellExpenses(month, expenseTypeId).forEach((expense) => {
           deletePromises.push(expenseService.deleteExpense(expense.id));
-        }
+        });
       });
 
       await Promise.all(deletePromises);
@@ -296,58 +313,24 @@ const ExpenseSheet = () => {
     setSelectionMode(false);
   };
 
-  const handleSave = async (month: number, expenseTypeId: number, value: string) => {
-    if (!user) return;
-    
-    const trimmedValue = value.trim();
-    const numValue = parseFloat(trimmedValue.replace(',', '.'));
-    
-    // Se o valor for vazio ou 0, deleta a despesa se existir
-    if (!trimmedValue || isNaN(numValue) || numValue <= 0) {
-      const existingExpense = expenses.find(
-        (e) => e.month === month && e.expenseTypeId === expenseTypeId
-      );
-      
-      if (existingExpense) {
-        try {
-          await expenseService.deleteExpense(existingExpense.id);
-          await loadData();
-        } catch (error) {
-          console.error('Error deleting expense:', error);
-          alert('Erro ao excluir despesa');
-        }
-      }
-      setEditingCell(null);
-      return;
-    }
-
+  const handleModalSave = async (request: ExpenseRequest) => {
     try {
-      const request: ExpenseRequest = {
-        userId: user.id,
-        expenseTypeId,
-        amount: numValue,
-        month,
-        year,
-      };
       await expenseService.createOrUpdateExpense(request);
       await loadData();
-      setEditingCell(null);
     } catch (error) {
       console.error('Error saving expense:', error);
       alert('Erro ao salvar despesa');
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent, month: number, expenseTypeId: number) => {
-    if (e.key === 'Enter') {
-      handleSave(month, expenseTypeId, editValue);
-    } else if (e.key === 'Escape') {
-      setEditingCell(null);
+  const handleModalDelete = async (id: number) => {
+    try {
+      await expenseService.deleteExpense(id);
+      await loadData();
+    } catch (error) {
+      console.error('Error deleting expense:', error);
+      alert('Erro ao excluir despesa');
     }
-  };
-
-  const handleBlur = (month: number, expenseTypeId: number) => {
-    handleSave(month, expenseTypeId, editValue);
   };
 
   const calculateMonthTotal = (month: number): number => {
@@ -854,7 +837,7 @@ const ExpenseSheet = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-slate-100/60">
-              {expenseTypes.map((type) => (
+              {expenseTypes.map((type, typeIndex) => (
                 <tr key={type.id} className="hover:bg-slate-50/50 transition-colors">
                   <td className="px-1 py-1.5 text-[10px] font-semibold text-slate-800 sticky left-0 bg-white z-10 border-r-2 border-slate-200/60 shadow-sm w-[80px] group/type">
                     <div className="flex items-center justify-between gap-1">
@@ -879,66 +862,98 @@ const ExpenseSheet = () => {
                     const isMonthPaid = paidMonths.has(monthKey);
                     const value = getCellValue(month, type.id);
                     const colorClass = getCellColor(month, type.id);
-                    const isEditing = editingCell?.month === month && editingCell?.expenseTypeId === type.id;
                     const cellKey = `${month}-${type.id}`;
                     const isSelected = selectedCells.has(cellKey);
-                    const existingExpense = expenses.find(
-                      (e) => e.month === month && e.expenseTypeId === type.id
-                    );
-                    
+                    const cellExpenses = getCellExpenses(month, type.id);
+
                     return (
                       <td
                         key={monthIndex}
                         className={`px-2 py-1.5 text-[11px] text-center border border-r border-slate-200/40 ${
-                          isMonthPaid 
-                            ? 'bg-emerald-50/80 border-emerald-200/60 hover:bg-emerald-100/80' 
+                          isMonthPaid
+                            ? 'bg-emerald-50/80 border-emerald-200/60 hover:bg-emerald-100/80'
                             : colorClass
-                        } ${
-                          isEditing ? '' : 'cursor-pointer hover:opacity-90'
-                        } ${
+                        } cursor-pointer hover:opacity-90 ${
                           isSelected ? 'ring-2 ring-amber-400/60 bg-amber-50/80' : ''
                         } transition-all relative group`}
-                        onClick={(e) => !isEditing && handleCellClick(month, type.id, e)}
+                        onClick={(e) => handleCellClick(month, type.id, e)}
                       >
-                        {isEditing ? (
-                          <input
-                            ref={inputRef}
-                            type="text"
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            onBlur={() => handleBlur(month, type.id)}
-                            onKeyDown={(e) => handleKeyDown(e, month, type.id)}
-                            className="w-full text-center text-[11px] font-medium bg-white border-2 border-blue-500 rounded-lg px-1 py-0.5 focus:outline-none focus:ring-2 focus:ring-blue-400/50 shadow-sm"
-                            autoFocus
-                            placeholder="0.00"
-                          />
+                        {value > 0 ? (
+                          <span className="font-medium">{formatCurrency(value)}</span>
                         ) : (
+                          <span className="text-slate-300">-</span>
+                        )}
+                        {cellExpenses.length > 1 && (
                           <>
-                            {value > 0 ? (
-                              <span className="font-medium">{formatCurrency(value)}</span>
-                            ) : (
-                              <span className="text-slate-300">-</span>
-                            )}
-                            {existingExpense && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (confirm('Deseja excluir esta despesa?')) {
-                                    expenseService.deleteExpense(existingExpense.id).then(() => {
-                                      loadData();
-                                    }).catch((error) => {
-                                      console.error('Error deleting expense:', error);
-                                      alert('Erro ao excluir despesa');
-                                    });
-                                  }
-                                }}
-                                className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold shadow-md ring-1 ring-red-400/30"
-                                title="Excluir despesa"
-                              >
-                                ×
-                              </button>
-                            )}
+                            <span className="absolute bottom-0.5 left-0.5 text-[8px] font-bold text-slate-500 bg-white/80 rounded px-1 leading-tight ring-1 ring-slate-300/50">
+                              {cellExpenses.length}
+                            </span>
+                            {/* Nas primeiras linhas abre para baixo e nas colunas das pontas alinha pela
+                                borda: o overflow da tabela cortaria o tooltip nesses casos. */}
+                            <div
+                              className={`absolute z-30 hidden group-hover:block pointer-events-none ${
+                                typeIndex < 2 ? 'top-full mt-1' : 'bottom-full mb-1'
+                              } ${
+                                monthIndex === 0
+                                  ? 'left-0'
+                                  : monthIndex === 11
+                                  ? 'right-0'
+                                  : 'left-1/2 -translate-x-1/2'
+                              }`}
+                            >
+                              <div className="bg-slate-800 text-white rounded-lg shadow-xl px-2.5 py-2 min-w-[150px] max-w-[240px] text-left">
+                                {cellExpenses.map((exp) => (
+                                  <div key={exp.id} className="flex items-baseline gap-2 py-0.5">
+                                    <span
+                                      className={`shrink-0 w-1.5 h-1.5 rounded-full ${
+                                        exp.userColor === 'blue' ? 'bg-blue-400' : 'bg-pink-400'
+                                      }`}
+                                    />
+                                    <span className="text-[10px] font-semibold whitespace-nowrap">
+                                      {formatCurrency(exp.amount)}
+                                    </span>
+                                    <span className="text-[10px] text-slate-300 truncate">
+                                      {exp.description || 'sem descrição'}
+                                    </span>
+                                  </div>
+                                ))}
+                                <div className="border-t border-slate-600 mt-1 pt-1 flex justify-between gap-2">
+                                  <span className="text-[10px] text-slate-400">Total</span>
+                                  <span className="text-[10px] font-bold">{formatCurrency(value)}</span>
+                                </div>
+                              </div>
+                            </div>
                           </>
+                        )}
+                        {cellExpenses.length > 0 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConfirmDelete({
+                                title: cellExpenses.length > 1
+                                  ? `Excluir ${cellExpenses.length} lançamentos?`
+                                  : 'Excluir despesa?',
+                                message: cellExpenses.length > 1
+                                  ? `${type.name} · ${monthNames[monthIndex]} ${year} — todos os ${cellExpenses.length} lançamentos (${formatCurrency(value)}) serão excluídos.`
+                                  : `${type.name} · ${monthNames[monthIndex]} ${year} — ${formatCurrency(value)}.`,
+                                onConfirm: () => {
+                                  Promise.all(
+                                    cellExpenses.map((exp) => expenseService.deleteExpense(exp.id))
+                                  ).then(() => {
+                                    loadData();
+                                  }).catch((error) => {
+                                    console.error('Error deleting expense:', error);
+                                    alert('Erro ao excluir despesa');
+                                  });
+                                  setConfirmDelete(null);
+                                },
+                              });
+                            }}
+                            className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold shadow-md ring-1 ring-red-400/30"
+                            title={cellExpenses.length > 1 ? 'Excluir todos os lançamentos' : 'Excluir despesa'}
+                          >
+                            ×
+                          </button>
                         )}
                       </td>
                     );
@@ -1464,6 +1479,31 @@ const ExpenseSheet = () => {
           </div>
         </>
       )}
+
+      {modalCell && user && (
+        <ExpenseModal
+          isOpen={true}
+          onClose={() => setModalCell(null)}
+          onSave={handleModalSave}
+          onDelete={handleModalDelete}
+          expenses={getCellExpenses(modalCell.month, modalCell.expenseTypeId)}
+          expenseTypeName={
+            expenseTypes.find((t) => t.id === modalCell.expenseTypeId)?.name || ''
+          }
+          expenseTypeId={modalCell.expenseTypeId}
+          userId={user.id}
+          month={modalCell.month}
+          year={year}
+        />
+      )}
+
+      <ConfirmModal
+        isOpen={confirmDelete !== null}
+        title={confirmDelete?.title || ''}
+        message={confirmDelete?.message || ''}
+        onConfirm={() => confirmDelete?.onConfirm()}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 };

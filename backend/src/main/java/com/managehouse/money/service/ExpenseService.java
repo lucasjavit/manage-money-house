@@ -35,22 +35,18 @@ public class ExpenseService {
         ExpenseType expenseType = expenseTypeService.findById(request.getExpenseTypeId())
                 .orElseThrow(() -> new RuntimeException("Expense type not found"));
 
-        // Verifica se já existe uma despesa para este usuário, tipo, mês e ano
-        // Se existir, atualiza; se não, cria nova
-        Expense expense = expenseRepository
-                .findByYearAndMonthAndExpenseTypeAndUser(
-                        request.getYear(),
-                        request.getMonth(),
-                        request.getExpenseTypeId(),
-                        user.getId()
-                )
-                .orElse(new Expense());
+        // Sem id, cria um novo lançamento: a mesma célula (tipo/mês/ano) aceita vários.
+        Expense expense = request.getId() == null
+                ? new Expense()
+                : expenseRepository.findById(request.getId())
+                        .orElseThrow(() -> new RuntimeException("Expense not found"));
 
         expense.setUser(user);
         expense.setExpenseType(expenseType);
         expense.setAmount(request.getAmount());
         expense.setMonth(request.getMonth());
         expense.setYear(request.getYear());
+        expense.setDescription(request.getDescription());
 
         Expense saved = expenseRepository.save(expense);
         return toResponse(saved);
@@ -109,6 +105,7 @@ public class ExpenseService {
                 expense.getAmount(),
                 expense.getMonth(),
                 expense.getYear(),
+                expense.getDescription(),
                 expense.getRecurringExpense() != null ? expense.getRecurringExpense().getId() : null,
                 expense.getCreatedAt()
         );

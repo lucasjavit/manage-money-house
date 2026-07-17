@@ -213,7 +213,7 @@ public class RealPortfolioService {
         List<PortfolioPosition> positions = positionRepository.findByPortfolioId(portfolio.getId());
         List<PortfolioDividend> dividends = dividendRepository.findByPortfolioId(portfolio.getId());
 
-        String apiKey = configurationService.getOpenAIKey();
+        String apiKey = configurationService.getActiveProviderKey();
         if (apiKey == null || apiKey.isEmpty()) {
             return "Chave OpenAI nao configurada.";
         }
@@ -250,7 +250,7 @@ public class RealPortfolioService {
         UserRealPortfolio portfolio = portfolioOpt.get();
         List<PortfolioPosition> positions = positionRepository.findByPortfolioId(portfolio.getId());
 
-        String apiKey = configurationService.getOpenAIKey();
+        String apiKey = configurationService.getActiveProviderKey();
         if (apiKey == null || apiKey.isEmpty()) {
             log.error("Chave OpenAI nao configurada");
             return;

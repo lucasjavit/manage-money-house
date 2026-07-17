@@ -56,7 +56,7 @@ public class PortfolioReviewService {
         }
 
         // Tentar análise com IA
-        String apiKey = configurationService.getOpenAIKey();
+        String apiKey = configurationService.getActiveProviderKey();
         PortfolioAnalysis analysis;
 
         if (apiKey != null && !apiKey.isEmpty()) {

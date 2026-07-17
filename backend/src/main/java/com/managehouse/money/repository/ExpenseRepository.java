@@ -7,27 +7,23 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
-import java.util.Optional;
 
 @Repository
 public interface ExpenseRepository extends JpaRepository<Expense, Long> {
     List<Expense> findByYear(Integer year);
     
+    // Uma célula (tipo/mês/ano) pode ter vários lançamentos do mesmo usuário.
     @Query("SELECT e FROM Expense e WHERE e.year = :year AND e.month = :month AND e.expenseType.id = :expenseTypeId AND e.user.id = :userId")
-    Optional<Expense> findByYearAndMonthAndExpenseTypeAndUser(
+    List<Expense> findByYearAndMonthAndExpenseTypeAndUser(
         @Param("year") Integer year,
         @Param("month") Integer month,
         @Param("expenseTypeId") Long expenseTypeId,
         @Param("userId") Long userId
     );
-    
-    @Query("SELECT e FROM Expense e WHERE e.year = :year AND e.month = :month AND e.expenseType.id = :expenseTypeId")
-    Optional<Expense> findByYearAndMonthAndExpenseType(
-        @Param("year") Integer year,
-        @Param("month") Integer month,
-        @Param("expenseTypeId") Long expenseTypeId
-    );
-    
+
+    @Query("SELECT e FROM Expense e WHERE e.recurringExpense.id = :recurringExpenseId")
+    List<Expense> findByRecurringExpenseId(@Param("recurringExpenseId") Long recurringExpenseId);
+
     @Query("SELECT e FROM Expense e WHERE e.year = :year AND e.month = :month")
     List<Expense> findByYearAndMonth(@Param("year") Integer year, @Param("month") Integer month);
 

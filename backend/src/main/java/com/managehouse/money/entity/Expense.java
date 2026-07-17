@@ -35,6 +35,9 @@ public class Expense {
     @Column(nullable = false)
     private Integer year;
 
+    @Column(length = 255)
+    private String description;
+
     @ManyToOne
     @JoinColumn(name = "recurring_expense_id", nullable = true)
     private RecurringExpense recurringExpense;

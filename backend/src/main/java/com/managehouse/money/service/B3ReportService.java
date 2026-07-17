@@ -68,7 +68,7 @@ public class B3ReportService {
             }
 
             // 3. Usar IA para parsear os dados
-            String apiKey = configurationService.getOpenAIKey();
+            String apiKey = configurationService.getActiveProviderKey();
             if (apiKey == null || apiKey.isEmpty()) {
                 log.error("Chave OpenAI nao configurada");
                 return B3ReportUploadResponse.builder()

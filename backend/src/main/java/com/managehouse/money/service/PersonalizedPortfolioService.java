@@ -50,7 +50,7 @@ public class PersonalizedPortfolioService {
         log.info("Ativos elegiveis (bom preco): {}", eligibleAssets.size());
 
         // 4. Tentar usar IA para selecionar os melhores ativos
-        String apiKey = configurationService.getOpenAIKey();
+        String apiKey = configurationService.getActiveProviderKey();
         InvestmentPortfolio portfolio;
 
         if (apiKey != null && !apiKey.isEmpty()) {

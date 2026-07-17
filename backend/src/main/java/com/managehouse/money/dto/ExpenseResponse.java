@@ -20,6 +20,7 @@ public class ExpenseResponse {
     private BigDecimal amount;
     private Integer month;
     private Integer year;
+    private String description;
     private Long recurringExpenseId;
     private LocalDateTime createdAt;
 }

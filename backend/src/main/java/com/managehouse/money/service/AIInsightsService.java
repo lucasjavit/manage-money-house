@@ -46,7 +46,7 @@ public class AIInsightsService {
      * Retorna null se não houver API key configurada.
      */
     private ChatLanguageModel getChatModel() {
-        String apiKey = configurationService.getOpenAIKey();
+        String apiKey = configurationService.getActiveProviderKey();
         if (apiKey == null || apiKey.isEmpty()) {
             logger.warn("OpenAI API key not configured. AI features will not work.");
             return null;

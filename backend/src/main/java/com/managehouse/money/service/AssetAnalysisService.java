@@ -39,7 +39,7 @@ public class AssetAnalysisService {
         }
 
         // Tentar análise com IA
-        String apiKey = configurationService.getOpenAIKey();
+        String apiKey = configurationService.getActiveProviderKey();
         if (apiKey != null && !apiKey.isEmpty()) {
             try {
                 return generateAIAnalysis(asset, portfolioType, economicContext, apiKey);

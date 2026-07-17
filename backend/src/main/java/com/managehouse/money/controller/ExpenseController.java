@@ -20,8 +20,9 @@ public class ExpenseController {
 
     @GetMapping
     public ResponseEntity<List<ExpenseResponse>> getExpenses(
-            @RequestParam(required = false, defaultValue = "2024") Integer year) {
-        return ResponseEntity.ok(expenseService.getExpensesByYear(year));
+            @RequestParam(required = false) Integer year) {
+        int targetYear = year != null ? year : java.time.Year.now().getValue();
+        return ResponseEntity.ok(expenseService.getExpensesByYear(targetYear));
     }
 
     @PostMapping
