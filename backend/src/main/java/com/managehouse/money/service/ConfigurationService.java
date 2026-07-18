@@ -73,6 +73,11 @@ public class ConfigurationService {
         return getValue("anthropic.api.key");
     }
 
+    /** Token compartilhado que protege a rota /api/ingest (app Android). */
+    public String getIngestToken() {
+        return getValue("ingest.token");
+    }
+
     /** "openai" (padrão) ou "anthropic": qual provider de IA a aplicação usa. */
     public String getAIProvider() {
         String provider = getValue("ai.provider");

@@ -1,9 +1,11 @@
 package com.managehouse.money.config;
 
+import com.managehouse.money.entity.Configuration;
 import com.managehouse.money.entity.ExpenseType;
 import com.managehouse.money.entity.ExtractExpenseType;
 import com.managehouse.money.entity.ExtractTransaction;
 import com.managehouse.money.entity.User;
+import com.managehouse.money.repository.ConfigurationRepository;
 import com.managehouse.money.repository.ExpenseTypeRepository;
 import com.managehouse.money.repository.ExtractExpenseTypeRepository;
 import com.managehouse.money.repository.ExtractTransactionRepository;
@@ -18,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
 @Component
 @Slf4j
@@ -26,20 +29,23 @@ public class DataInitializer implements CommandLineRunner {
     private final ExpenseTypeRepository expenseTypeRepository;
     private final ExtractExpenseTypeRepository extractExpenseTypeRepository;
     private final ExtractTransactionRepository extractTransactionRepository;
-    
+    private final ConfigurationRepository configurationRepository;
+
     @PersistenceContext
     private EntityManager entityManager;
-    
+
     @Autowired
     public DataInitializer(
             UserRepository userRepository,
             ExpenseTypeRepository expenseTypeRepository,
             ExtractExpenseTypeRepository extractExpenseTypeRepository,
-            ExtractTransactionRepository extractTransactionRepository) {
+            ExtractTransactionRepository extractTransactionRepository,
+            ConfigurationRepository configurationRepository) {
         this.userRepository = userRepository;
         this.expenseTypeRepository = expenseTypeRepository;
         this.extractExpenseTypeRepository = extractExpenseTypeRepository;
         this.extractTransactionRepository = extractTransactionRepository;
+        this.configurationRepository = configurationRepository;
     }
 
     @Override
@@ -50,6 +56,43 @@ public class DataInitializer implements CommandLineRunner {
         initializeExpenseTypes();
         initializeExtractExpenseTypes();
         migrateExtractTransactions();
+        createBankTransactionIndexes();
+        initializeIngestToken();
+    }
+
+    /**
+     * Ajusta o schema de bank_transactions que o ddl-auto=update não faz sozinho: afrouxar o
+     * NOT NULL de amount e garantir a coluna/constraint de needs_review. DDL idempotente,
+     * seguindo o padrão de fixExtractTransactionsSchema.
+     */
+    private void createBankTransactionIndexes() {
+        try {
+            entityManager.createNativeQuery(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ux_bank_tx_external_id " +
+                    "ON bank_transactions (external_id)").executeUpdate();
+            entityManager.createNativeQuery(
+                    "ALTER TABLE bank_transactions ALTER COLUMN amount DROP NOT NULL").executeUpdate();
+            entityManager.createNativeQuery(
+                    "ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS needs_review " +
+                    "BOOLEAN NOT NULL DEFAULT FALSE").executeUpdate();
+            log.info("Schema de bank_transactions ajustado (amount nullable, needs_review).");
+        } catch (Exception e) {
+            log.warn("Não foi possível ajustar bank_transactions (pode ainda não existir): {}",
+                    e.getMessage());
+        }
+    }
+
+    /** Gera o token de ingestão do app Android na primeira execução. */
+    private void initializeIngestToken() {
+        if (configurationRepository.findByKey("ingest.token").isPresent()) {
+            return;
+        }
+        Configuration config = new Configuration();
+        config.setKey("ingest.token");
+        config.setValue(UUID.randomUUID().toString());
+        config.setDescription("Token do app Android para a rota /api/ingest");
+        configurationRepository.save(config);
+        log.info("=== Token de ingestão (app Android) gerado. Consulte em Configurações ou no banco. ===");
     }
     
     private void fixExtractTransactionsSchema() {

@@ -566,7 +566,7 @@ public class ExtractService {
         return transactions;
     }
     
-    private Long mapExpenseTypeByName(String description, List<ExtractExpenseType> expenseTypes) {
+    public Long mapExpenseTypeByName(String description, List<ExtractExpenseType> expenseTypes) {
         if (description == null) return null;
         
         String descLower = description.toLowerCase()
