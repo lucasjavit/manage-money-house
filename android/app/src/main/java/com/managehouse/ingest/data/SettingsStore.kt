@@ -18,6 +18,8 @@ class SettingsStore(private val context: Context) {
     private val baseUrlKey = stringPreferencesKey("base_url")
     private val tokenKey = stringPreferencesKey("ingest_token")
     private val packagesKey = stringSetPreferencesKey("monitored_packages")
+    // Cache dos tipos da casa, no formato "id:nome" por item, para não depender de rede na hora.
+    private val houseTypesKey = stringSetPreferencesKey("house_types")
 
     companion object {
         const val DEFAULT_BASE_URL = "http://192.168.1.20:8081"
@@ -52,4 +54,22 @@ class SettingsStore(private val context: Context) {
     suspend fun saveMonitoredPackages(packages: Set<String>) {
         context.dataStore.edit { it[packagesKey] = packages }
     }
+
+    /** Salva os tipos da casa em cache local (cada item "id:nome"). */
+    suspend fun saveHouseTypes(types: List<Pair<Long, String>>) {
+        context.dataStore.edit { prefs ->
+            prefs[houseTypesKey] = types.map { "${it.first}:${it.second}" }.toSet()
+        }
+    }
+
+    /** Lê os tipos da casa do cache local, ordenados por id. */
+    suspend fun houseTypes(): List<Pair<Long, String>> =
+        context.dataStore.data.map { prefs ->
+            (prefs[houseTypesKey] ?: emptySet()).mapNotNull { entry ->
+                val i = entry.indexOf(':')
+                if (i <= 0) return@mapNotNull null
+                val id = entry.substring(0, i).toLongOrNull() ?: return@mapNotNull null
+                id to entry.substring(i + 1)
+            }.sortedBy { it.first }
+        }.first()
 }

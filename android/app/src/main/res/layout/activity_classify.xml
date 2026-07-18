@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:background="@color/bg">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Nova transação"
+            android:textColor="@color/on_surface"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:paddingTop="16dp"
+            android:paddingBottom="16dp" />
+
+        <!-- Card com o texto da notificação -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="20dp"
+            app:cardElevation="0dp"
+            app:strokeColor="@color/outline"
+            app:strokeWidth="1dp"
+            app:cardBackgroundColor="@color/surface">
+
+            <TextView
+                android:id="@+id/rawTextView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="20dp"
+                android:textColor="@color/on_surface_variant"
+                android:textSize="16sp"
+                android:lineSpacingExtra="4dp"
+                tools:text="Compra aprovada: IFOOD no valor de R$ 47,90" />
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="A quem pertence este gasto?"
+            android:textColor="@color/on_surface"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:paddingTop="28dp"
+            android:paddingBottom="12dp" />
+
+        <!-- Meu gasto (pessoal) -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/personalBtn"
+            style="@style/Widget.MoneyIngest.Button.Personal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Meu gasto (Lucas)"
+            app:icon="@android:drawable/ic_menu_myplaces"
+            app:iconGravity="textStart" />
+
+        <!-- Card da planilha da casa -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:cardCornerRadius="20dp"
+            app:cardElevation="0dp"
+            app:cardBackgroundColor="@color/brand_container">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Planilha da casa"
+                    android:textColor="@color/on_brand_container"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Escolha o tipo da despesa:"
+                    android:textColor="@color/on_brand_container"
+                    android:textSize="13sp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="12dp" />
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="0dp"
+                    app:cardBackgroundColor="@color/surface">
+
+                    <Spinner
+                        android:id="@+id/typeSpinner"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:padding="8dp" />
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/saveHouseBtn"
+                    style="@style/Widget.MoneyIngest.Button.House"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="Salvar na planilha da casa"
+                    app:icon="@android:drawable/ic_menu_save"
+                    app:iconGravity="textStart" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+    </LinearLayout>
+</ScrollView>

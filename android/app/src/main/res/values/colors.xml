@@ -1,4 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#E8F5E9</color>
+    <!-- Marca: verde-dinheiro -->
+    <color name="brand">#1E8E5A</color>
+    <color name="brand_dark">#14663F</color>
+    <color name="brand_container">#D2F2E0</color>
+    <color name="on_brand_container">#0A3D26</color>
+
+    <!-- Neutros -->
+    <color name="bg">#F6F8F7</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="on_surface">#1A1C1B</color>
+    <color name="on_surface_variant">#5A635E</color>
+    <color name="outline">#C3CBC6</color>
+
+    <!-- Acentos -->
+    <color name="personal">#3F6FE0</color>
+    <color name="personal_container">#DDE6FF</color>
+    <color name="house">#1E8E5A</color>
+
+    <color name="ic_launcher_background">#1E8E5A</color>
 </resources>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <style name="Theme.MoneyIngest" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/brand</item>
+        <item name="colorPrimaryDark">@color/brand_dark</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorPrimaryContainer">@color/brand_container</item>
+        <item name="colorOnPrimaryContainer">@color/on_brand_container</item>
+
+        <item name="android:colorBackground">@color/bg</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/on_surface</item>
+        <item name="colorOnSurfaceVariant">@color/on_surface_variant</item>
+        <item name="colorOutline">@color/outline</item>
+
+        <item name="android:statusBarColor">@color/brand_dark</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <!-- Botão de destaque (Salvar na casa) -->
+    <style name="Widget.MoneyIngest.Button.House" parent="Widget.Material3.Button">
+        <item name="backgroundTint">@color/house</item>
+        <item name="cornerRadius">16dp</item>
+        <item name="android:paddingTop">16dp</item>
+        <item name="android:paddingBottom">16dp</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+
+    <!-- Botão secundário (Meu gasto) -->
+    <style name="Widget.MoneyIngest.Button.Personal" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="strokeColor">@color/personal</item>
+        <item name="android:textColor">@color/personal</item>
+        <item name="cornerRadius">16dp</item>
+        <item name="android:paddingTop">16dp</item>
+        <item name="android:paddingBottom">16dp</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+</resources>

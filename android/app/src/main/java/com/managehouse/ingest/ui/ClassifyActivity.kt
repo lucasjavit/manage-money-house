@@ -1,28 +1,22 @@
 package com.managehouse.ingest.ui
 
 import android.os.Bundle
-import android.view.Gravity
-import android.view.View
 import android.widget.ArrayAdapter
-import android.widget.Button
-import android.widget.LinearLayout
-import android.widget.Spinner
-import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.managehouse.ingest.data.AppDatabase
 import com.managehouse.ingest.data.PendingTx
 import com.managehouse.ingest.data.SettingsStore
-import com.managehouse.ingest.net.ApiFactory
-import com.managehouse.ingest.net.ExpenseType
+import com.managehouse.ingest.databinding.ActivityClassifyBinding
 import com.managehouse.ingest.work.Sync
 import kotlinx.coroutines.launch
 
 /**
- * Tela disparada por cada notificação capturada. O usuário decide "seu gasto" ou "da casa";
- * se da casa, escolhe o tipo (os 23 da planilha, com o valor extraído pela IA vindo depois).
- * A tela NÃO extrai valor — só encaminha o texto cru; a IA no backend faz o resto.
+ * Tela disparada por cada notificação capturada. O usuário decide o destino:
+ *  - "Meu gasto (Lucas)": transação pessoal, não vai à planilha da casa.
+ *  - "Salvar na planilha da casa": usa o tipo escolhido no seletor (23 tipos, do cache local).
+ * A tela NÃO extrai valor — encaminha o texto cru; a IA no backend faz o resto.
  */
 class ClassifyActivity : AppCompatActivity() {
 
@@ -33,11 +27,12 @@ class ClassifyActivity : AppCompatActivity() {
         const val EXTRA_TIMESTAMP = "timestamp"
     }
 
+    private lateinit var binding: ActivityClassifyBinding
     private lateinit var externalId: String
     private lateinit var rawText: String
     private lateinit var pkg: String
     private var timestamp: Long = 0
-    private var houseTypes: List<ExpenseType> = emptyList()
+    private var houseTypes: List<Pair<Long, String>> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,78 +41,48 @@ class ClassifyActivity : AppCompatActivity() {
         pkg = intent.getStringExtra(EXTRA_PACKAGE).orEmpty()
         timestamp = intent.getLongExtra(EXTRA_TIMESTAMP, System.currentTimeMillis())
 
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(48, 64, 48, 48)
-        }
+        binding = ActivityClassifyBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        root.addView(TextView(this).apply {
-            text = "Nova transação"
-            textSize = 20f
-        })
-        root.addView(TextView(this).apply {
-            text = rawText
-            textSize = 15f
-            setPadding(0, 24, 0, 32)
-        })
+        binding.rawTextView.text = rawText
 
-        val spinner = Spinner(this).apply { visibility = View.GONE }
-        root.addView(spinner)
-
-        val personalBtn = Button(this).apply {
-            text = "Meu gasto (Lucas)"
-            setOnClickListener { save("personal", null) }
-        }
-        val houseBtn = Button(this).apply { text = "Gasto da casa" }
-        val confirmHouseBtn = Button(this).apply {
-            text = "Confirmar (casa)"
-            visibility = View.GONE
-            setOnClickListener {
-                val idx = spinner.selectedItemPosition
-                if (idx in houseTypes.indices) save("house", houseTypes[idx].id)
-            }
-        }
-        houseBtn.setOnClickListener {
-            if (houseTypes.isEmpty()) {
-                Toast.makeText(this, "Tipos ainda não carregaram", Toast.LENGTH_SHORT).show()
+        binding.personalBtn.setOnClickListener { save("personal", null) }
+        binding.saveHouseBtn.setOnClickListener {
+            val idx = binding.typeSpinner.selectedItemPosition
+            if (idx in houseTypes.indices) {
+                save("house", houseTypes[idx].first)
             } else {
-                spinner.visibility = View.VISIBLE
-                confirmHouseBtn.visibility = View.VISIBLE
+                Toast.makeText(this, "Escolha um tipo", Toast.LENGTH_SHORT).show()
             }
         }
 
-        root.addView(personalBtn)
-        root.addView(houseBtn)
-        root.addView(confirmHouseBtn)
-        root.gravity = Gravity.CENTER_VERTICAL
-        setContentView(root)
-
-        loadHouseTypes(spinner)
+        loadHouseTypes()
     }
 
-    private fun loadHouseTypes(spinner: Spinner) {
+    private fun loadHouseTypes() {
         lifecycleScope.launch {
-            try {
-                val api = ApiFactory.create(SettingsStore(applicationContext).baseUrl())
-                val resp = api.expenseTypes()
-                if (resp.isSuccessful) {
-                    houseTypes = resp.body().orEmpty()
-                    spinner.adapter = ArrayAdapter(
-                        this@ClassifyActivity,
-                        android.R.layout.simple_spinner_dropdown_item,
-                        houseTypes.map { it.name }
-                    )
-                }
-            } catch (_: Exception) {
-                // Sem rede agora: o botão "da casa" avisa. "Meu gasto" segue funcionando offline.
+            houseTypes = SettingsStore(applicationContext).houseTypes()
+            if (houseTypes.isEmpty()) {
+                binding.typeSpinner.adapter = ArrayAdapter(
+                    this@ClassifyActivity,
+                    android.R.layout.simple_spinner_dropdown_item,
+                    listOf("Abra o app e toque \"Atualizar tipos\"")
+                )
+                binding.saveHouseBtn.isEnabled = false
+            } else {
+                binding.typeSpinner.adapter = ArrayAdapter(
+                    this@ClassifyActivity,
+                    android.R.layout.simple_spinner_dropdown_item,
+                    houseTypes.map { it.second }
+                )
+                binding.saveHouseBtn.isEnabled = true
             }
         }
     }
 
     private fun save(destination: String, expenseTypeId: Long?) {
         lifecycleScope.launch {
-            val dao = AppDatabase.get(applicationContext).pendingTxDao()
-            dao.insert(
+            AppDatabase.get(applicationContext).pendingTxDao().insert(
                 PendingTx(
                     externalId = externalId,
                     rawText = rawText,

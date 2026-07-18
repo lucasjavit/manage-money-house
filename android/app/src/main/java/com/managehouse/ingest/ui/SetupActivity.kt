@@ -3,74 +3,36 @@ package com.managehouse.ingest.ui
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
-import android.text.InputType
-import android.widget.Button
-import android.widget.EditText
-import android.widget.LinearLayout
-import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.managehouse.ingest.data.SettingsStore
+import com.managehouse.ingest.databinding.ActivitySetupBinding
+import com.managehouse.ingest.net.ApiFactory
 import kotlinx.coroutines.launch
 
 /**
  * Tela inicial: configura URL do backend e token, habilita o listener de notificações,
- * e permite disparar uma notificação de teste (valida o fluxo sem gasto real).
+ * atualiza o cache dos tipos da casa, e dispara uma notificação de teste.
  */
 class SetupActivity : AppCompatActivity() {
 
+    private lateinit var binding: ActivitySetupBinding
     private lateinit var settings: SettingsStore
-    private lateinit var urlField: EditText
-    private lateinit var tokenField: EditText
-    private lateinit var statusView: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         settings = SettingsStore(this)
+        binding = ActivitySetupBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(48, 64, 48, 48)
+        binding.saveBtn.setOnClickListener { saveConfig() }
+        binding.enableListenerBtn.setOnClickListener {
+            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         }
+        binding.refreshTypesBtn.setOnClickListener { refreshHouseTypes() }
+        binding.testBtn.setOnClickListener { testFlow() }
 
-        root.addView(TextView(this).apply { text = "Money Ingest — Configuração"; textSize = 20f })
-
-        root.addView(TextView(this).apply { text = "URL do backend"; setPadding(0, 32, 0, 8) })
-        urlField = EditText(this).apply {
-            hint = SettingsStore.DEFAULT_BASE_URL
-            setText(SettingsStore.DEFAULT_BASE_URL)
-        }
-        root.addView(urlField)
-
-        root.addView(TextView(this).apply { text = "Token (X-Ingest-Token)"; setPadding(0, 24, 0, 8) })
-        tokenField = EditText(this).apply {
-            hint = "cole o token do backend"
-            inputType = InputType.TYPE_CLASS_TEXT
-        }
-        root.addView(tokenField)
-
-        root.addView(Button(this).apply {
-            text = "Salvar configuração"
-            setOnClickListener { saveConfig() }
-        })
-
-        root.addView(Button(this).apply {
-            text = "Habilitar leitura de notificações"
-            setOnClickListener {
-                startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-            }
-        })
-
-        root.addView(Button(this).apply {
-            text = "Notificação de teste"
-            setOnClickListener { testFlow() }
-        })
-
-        statusView = TextView(this).apply { setPadding(0, 32, 0, 0) }
-        root.addView(statusView)
-
-        setContentView(root)
         loadConfig()
     }
 
@@ -81,17 +43,38 @@ class SetupActivity : AppCompatActivity() {
 
     private fun loadConfig() {
         lifecycleScope.launch {
-            urlField.setText(settings.baseUrl())
-            tokenField.setText(settings.token())
+            binding.urlField.setText(settings.baseUrl())
+            binding.tokenField.setText(settings.token())
             updateStatus()
         }
     }
 
     private fun saveConfig() {
         lifecycleScope.launch {
-            settings.save(urlField.text.toString(), tokenField.text.toString())
+            settings.save(binding.urlField.text.toString(), binding.tokenField.text.toString())
             Toast.makeText(this@SetupActivity, "Configuração salva", Toast.LENGTH_SHORT).show()
             updateStatus()
+            refreshHouseTypes()
+        }
+    }
+
+    /** Busca os tipos da casa e guarda no cache local (usado pela tela de classificação). */
+    private fun refreshHouseTypes() {
+        lifecycleScope.launch {
+            try {
+                val api = ApiFactory.create(settings.baseUrl())
+                val resp = api.expenseTypes()
+                if (resp.isSuccessful) {
+                    val types = resp.body().orEmpty().map { it.id to it.name }
+                    settings.saveHouseTypes(types)
+                    Toast.makeText(this@SetupActivity, "${types.size} tipos atualizados", Toast.LENGTH_SHORT).show()
+                    updateStatus()
+                } else {
+                    Toast.makeText(this@SetupActivity, "Falha ao buscar tipos (HTTP ${resp.code()})", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(this@SetupActivity, "Sem conexão com o Pi para buscar tipos", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -99,9 +82,11 @@ class SetupActivity : AppCompatActivity() {
         val enabled = isListenerEnabled()
         lifecycleScope.launch {
             val hasToken = settings.token().isNotBlank()
-            statusView.text = buildString {
+            val typeCount = settings.houseTypes().size
+            binding.statusView.text = buildString {
                 append("Leitura de notificações: ").append(if (enabled) "ATIVA" else "DESATIVADA").append("\n")
-                append("Token: ").append(if (hasToken) "configurado" else "faltando")
+                append("Token: ").append(if (hasToken) "configurado" else "faltando").append("\n")
+                append("Tipos da casa em cache: ").append(typeCount)
             }
         }
     }
