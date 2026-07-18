@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Money Ingest</string>
+    <string name="channel_capture">Captura de transações</string>
+</resources>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Permite HTTP em claro apenas para o backend na LAN. O resto exige HTTPS. -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">192.168.1.20</domain>
+    </domain-config>
+</network-security-config>
