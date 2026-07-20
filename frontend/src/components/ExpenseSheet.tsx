@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useConfirm } from '../context/ConfirmContext';
 import { expenseService } from '../services/expenseService';
 import { recurringExpenseService } from '../services/recurringExpenseService';
 import { aiService } from '../services/aiService';
@@ -16,6 +17,7 @@ import IncomeStabilityChart from './charts/IncomeStabilityChart';
 
 const ExpenseSheet = () => {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const [year, setYear] = useState(new Date().getFullYear());
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [expenseTypes, setExpenseTypes] = useState<ExpenseType[]>([]);
@@ -171,9 +173,11 @@ const ExpenseSheet = () => {
   };
 
   const handleDeleteExpenseType = async (id: number, name: string) => {
-    if (!confirm(`Tem certeza que deseja excluir o tipo "${name}"?`)) {
-      return;
-    }
+    const ok = await confirm({
+      title: 'Excluir tipo de despesa?',
+      message: `O tipo "${name}" será removido.`,
+    });
+    if (!ok) return;
 
     try {
       await expenseService.deleteExpenseType(id);

@@ -1,10 +1,12 @@
 import React from 'react'
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { ConfirmProvider } from './context/ConfirmContext'
 import Login from './components/Login'
 import ExpenseSheet from './components/ExpenseSheet'
 import Settings from './components/Settings'
 import ExtractUpload from './components/ExtractUpload'
+import LucasExpenses from './components/LucasExpenses'
 import SalaryPage from './components/SalaryPage'
 import InvestmentPage from './components/InvestmentPage'
 import Sidebar from './components/Sidebar'
@@ -108,6 +110,7 @@ const AppContent = () => {
             <Route path="/" element={<ExpenseSheet />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/extract" element={<ExtractUpload />} />
+            <Route path="/lucas-gastos" element={<LucasExpenses />} />
             <Route path="/salary" element={<SalaryPage />} />
             <Route path="/investments" element={<InvestmentPage />} />
           </Routes>
@@ -121,7 +124,9 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <AppContent />
+        <ConfirmProvider>
+          <AppContent />
+        </ConfirmProvider>
       </AuthProvider>
     </Router>
   )

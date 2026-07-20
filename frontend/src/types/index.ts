@@ -695,3 +695,12 @@ export interface RealPortfolioDividend {
   unitPrice: number;
   netValue: number;
 }
+export interface BankTransaction {
+  id: number;
+  amount: number | null;
+  description: string;
+  transactionDate: string;
+  sourcePackage: string | null;
+  rawText: string | null;
+  needsReview: boolean;
+}

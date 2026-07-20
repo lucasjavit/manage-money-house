@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useConfirm } from '../context/ConfirmContext';
 import { extractService, type ExtractUploadRequest } from '../services/extractService';
 import type { ExpenseInsightsResponse, ExpenseType, ExtractTransaction, IdentifiedTransaction } from '../types';
 
 const ExtractUpload = () => {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const navigate = useNavigate();
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -294,8 +296,12 @@ const ExtractUpload = () => {
   };
 
   const handleDeleteTransaction = async (id: number) => {
-    if (!confirm('Deseja realmente excluir esta transação?')) return;
-    
+    const ok = await confirm({
+      title: 'Excluir transação?',
+      message: 'Esta transação do cartão será removida.',
+    });
+    if (!ok) return;
+
     try {
       await extractService.deleteTransaction(id);
       setSelectedTransactionIds(new Set());
@@ -323,8 +329,12 @@ const ExtractUpload = () => {
       return;
     }
     
-    if (!confirm(`Deseja realmente excluir ${selectedTransactionIds.size} transação(ões)?`)) return;
-    
+    const ok = await confirm({
+      title: `Excluir ${selectedTransactionIds.size} transação(ões)?`,
+      message: 'As transações selecionadas serão removidas.',
+    });
+    if (!ok) return;
+
     try {
       await extractService.deleteTransactions(Array.from(selectedTransactionIds));
       setSelectedTransactionIds(new Set());

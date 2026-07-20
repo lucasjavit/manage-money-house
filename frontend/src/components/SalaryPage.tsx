@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useConfirm } from '../context/ConfirmContext';
 import { salaryService } from '../services/salaryService';
 import { salaryDeductionService } from '../services/salaryDeductionService';
 import { salaryConversionService } from '../services/salaryConversionService';
@@ -8,6 +9,7 @@ import type { ExtractUploadRequest } from '../services/extractService';
 
 const SalaryPage = () => {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const [salary, setSalary] = useState<Salary | null>(null);
   const [loading, setLoading] = useState(false);
   const [fixedAmount, setFixedAmount] = useState<string>('');
@@ -211,7 +213,11 @@ const SalaryPage = () => {
   };
 
   const handleDeleteDeduction = async (id: number) => {
-    if (!confirm('Deseja realmente excluir este boleto?')) return;
+    const ok = await confirm({
+      title: 'Excluir boleto?',
+      message: 'Este boleto/desconto será removido.',
+    });
+    if (!ok) return;
     
     try {
       await salaryDeductionService.deleteDeduction(id);
@@ -319,7 +325,11 @@ const SalaryPage = () => {
 
   const handleDelete = async () => {
     if (!salary) return;
-    if (!confirm('Deseja realmente excluir seu salário?')) return;
+    const ok = await confirm({
+      title: 'Excluir salário?',
+      message: 'A configuração de salário será removida.',
+    });
+    if (!ok) return;
 
     setLoading(true);
     try {
