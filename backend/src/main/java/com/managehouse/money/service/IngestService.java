@@ -145,10 +145,15 @@ public class IngestService {
         return s == null || s.isBlank();
     }
 
+    /**
+     * Data usada para o lançamento. Regra do usuário: tudo que vem do celular é registrado no
+     * MÊS SEGUINTE ao da transação (mês da transação + 1). plusMonths trata virada de ano e
+     * dias inexistentes (ex: 31/jan -> 28/fev).
+     */
     private LocalDate resolveDate(Long timestamp) {
-        if (timestamp == null) {
-            return LocalDate.now(ZONE);
-        }
-        return Instant.ofEpochMilli(timestamp).atZone(ZONE).toLocalDate();
+        LocalDate base = (timestamp == null)
+                ? LocalDate.now(ZONE)
+                : Instant.ofEpochMilli(timestamp).atZone(ZONE).toLocalDate();
+        return base.plusMonths(1);
     }
 }
