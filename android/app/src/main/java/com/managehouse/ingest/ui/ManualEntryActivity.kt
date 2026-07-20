@@ -7,6 +7,7 @@ import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.managehouse.ingest.R
 import com.managehouse.ingest.data.AppDatabase
 import com.managehouse.ingest.data.PendingTx
 import com.managehouse.ingest.data.SettingsStore
@@ -55,19 +56,16 @@ class ManualEntryActivity : AppCompatActivity() {
     private fun loadHouseTypes() {
         lifecycleScope.launch {
             houseTypes = SettingsStore(applicationContext).houseTypes()
-            if (houseTypes.isEmpty()) {
-                binding.typeSpinner.adapter = ArrayAdapter(
-                    this@ManualEntryActivity,
-                    android.R.layout.simple_spinner_dropdown_item,
-                    listOf("Abra Configurações e toque \"Atualizar tipos\"")
-                )
+            val labels = if (houseTypes.isEmpty()) {
+                listOf("Abra Configurações e toque \"Atualizar tipos\"")
             } else {
-                binding.typeSpinner.adapter = ArrayAdapter(
-                    this@ManualEntryActivity,
-                    android.R.layout.simple_spinner_dropdown_item,
-                    houseTypes.map { it.second }
-                )
+                houseTypes.map { it.second }
             }
+            binding.typeSpinner.adapter = ArrayAdapter(
+                this@ManualEntryActivity,
+                R.layout.spinner_item,
+                labels
+            ).apply { setDropDownViewResource(R.layout.spinner_dropdown_item) }
         }
     }
 

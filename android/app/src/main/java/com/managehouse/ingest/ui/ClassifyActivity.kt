@@ -5,6 +5,7 @@ import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.managehouse.ingest.R
 import com.managehouse.ingest.data.AppDatabase
 import com.managehouse.ingest.data.PendingTx
 import com.managehouse.ingest.data.SettingsStore
@@ -62,21 +63,17 @@ class ClassifyActivity : AppCompatActivity() {
     private fun loadHouseTypes() {
         lifecycleScope.launch {
             houseTypes = SettingsStore(applicationContext).houseTypes()
-            if (houseTypes.isEmpty()) {
-                binding.typeSpinner.adapter = ArrayAdapter(
-                    this@ClassifyActivity,
-                    android.R.layout.simple_spinner_dropdown_item,
-                    listOf("Abra o app e toque \"Atualizar tipos\"")
-                )
-                binding.saveHouseBtn.isEnabled = false
+            val labels = if (houseTypes.isEmpty()) {
+                listOf("Abra o app e toque \"Atualizar tipos\"")
             } else {
-                binding.typeSpinner.adapter = ArrayAdapter(
-                    this@ClassifyActivity,
-                    android.R.layout.simple_spinner_dropdown_item,
-                    houseTypes.map { it.second }
-                )
-                binding.saveHouseBtn.isEnabled = true
+                houseTypes.map { it.second }
             }
+            binding.typeSpinner.adapter = ArrayAdapter(
+                this@ClassifyActivity,
+                R.layout.spinner_item,
+                labels
+            ).apply { setDropDownViewResource(R.layout.spinner_dropdown_item) }
+            binding.saveHouseBtn.isEnabled = houseTypes.isNotEmpty()
         }
     }
 
