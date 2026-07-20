@@ -5,7 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [PendingTx::class], version = 1, exportSchema = false)
+@Database(entities = [PendingTx::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun pendingTxDao(): PendingTxDao
 
@@ -18,7 +18,10 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "money-ingest.db"
-                ).build().also { instance = it }
+                )
+                    // A fila só guarda transações ainda não enviadas; recriar no upgrade é seguro.
+                    .fallbackToDestructiveMigration()
+                    .build().also { instance = it }
             }
     }
 }

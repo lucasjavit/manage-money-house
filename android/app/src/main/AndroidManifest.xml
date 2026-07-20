@@ -13,14 +13,20 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.MoneyIngest">
 
+        <!-- Tela inicial: registro manual de gastos -->
         <activity
-            android:name=".ui.SetupActivity"
+            android:name=".ui.ManualEntryActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Configuração (URL, token, listener, tipos): aberta pela engrenagem -->
+        <activity
+            android:name=".ui.SetupActivity"
+            android:exported="false" />
 
         <activity
             android:name=".ui.ClassifyActivity"

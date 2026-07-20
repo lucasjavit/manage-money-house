@@ -40,7 +40,9 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
                         timestamp = tx.timestamp,
                         packageName = tx.packageName,
                         destination = tx.destination,
-                        expenseTypeId = tx.expenseTypeId
+                        expenseTypeId = tx.expenseTypeId,
+                        amount = tx.amount,
+                        description = tx.description
                     )
                 )
                 // 200 (created/duplicate/needs_review) => tratado; some da fila.

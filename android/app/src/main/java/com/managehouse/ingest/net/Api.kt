@@ -15,7 +15,10 @@ data class IngestRequest(
     val timestamp: Long,
     val packageName: String,
     val destination: String,
-    val expenseTypeId: Long?
+    val expenseTypeId: Long?,
+    // Preenchidos no registro manual; quando amount vem, o backend não chama a IA.
+    val amount: Double? = null,
+    val description: String? = null
 )
 
 @JsonClass(generateAdapter = true)
