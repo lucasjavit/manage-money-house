@@ -33,6 +33,19 @@
             android:exported="false"
             android:launchMode="singleTop" />
 
+        <!-- Recebe texto compartilhado: "Money Ingest" aparece no menu Compartilhar do Android -->
+        <activity
+            android:name=".ui.ShareReceiverActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+
         <!-- exported=true é obrigatório: quem faz o bind é o próprio sistema Android.
              Com false, o app nem aparece na tela de "Acesso a notificações". -->
         <service
