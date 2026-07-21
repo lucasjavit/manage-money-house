@@ -20,6 +20,8 @@ class SettingsStore(private val context: Context) {
     private val packagesKey = stringSetPreferencesKey("monitored_packages")
     // Cache dos tipos da casa, no formato "id:nome" por item, para não depender de rede na hora.
     private val houseTypesKey = stringSetPreferencesKey("house_types")
+    // Diagnóstico: últimos pacotes que dispararam notificação (para descobrir o pacote real dos bancos).
+    private val seenPackagesKey = stringSetPreferencesKey("seen_packages")
 
     companion object {
         const val DEFAULT_BASE_URL = "http://192.168.1.20:8081"
@@ -29,9 +31,13 @@ class SettingsStore(private val context: Context) {
             "br.com.intermedium",       // Inter
             "com.c6bank.app",           // C6
             "com.itau",                 // Itaú
+            "com.itau.empresas",        // Itaú Empresas
             "com.bradesco",             // Bradesco
             "br.com.bb.android",        // Banco do Brasil
-            "com.santander.app"         // Santander
+            "com.santander.app",        // Santander
+            "com.btg.pactual.banking",  // BTG Banking
+            "com.btg.pactual",          // BTG (variações)
+            "br.com.btgpactual.banking"
         )
     }
 
@@ -42,7 +48,10 @@ class SettingsStore(private val context: Context) {
         context.dataStore.data.map { it[tokenKey] ?: "" }.first()
 
     suspend fun monitoredPackages(): Set<String> =
-        context.dataStore.data.map { it[packagesKey] ?: DEFAULT_PACKAGES }.first()
+        context.dataStore.data.map {
+            // Um set salvo vazio não deve zerar a captura: cai no default.
+            it[packagesKey]?.takeIf { s -> s.isNotEmpty() } ?: DEFAULT_PACKAGES
+        }.first()
 
     suspend fun save(baseUrl: String, token: String) {
         context.dataStore.edit {
@@ -53,6 +62,32 @@ class SettingsStore(private val context: Context) {
 
     suspend fun saveMonitoredPackages(packages: Set<String>) {
         context.dataStore.edit { it[packagesKey] = packages }
+    }
+
+    /** Registra um pacote que gerou notificação (para diagnóstico na tela de config). */
+    suspend fun recordSeenPackage(entry: String) {
+        context.dataStore.edit { prefs ->
+            val current = prefs[seenPackagesKey]?.toMutableSet() ?: mutableSetOf()
+            current.add(entry)
+            // Mantém no máximo 30 para não crescer sem limite.
+            prefs[seenPackagesKey] = current.toList().takeLast(30).toSet()
+        }
+    }
+
+    suspend fun seenPackages(): Set<String> =
+        context.dataStore.data.map { it[seenPackagesKey] ?: emptySet() }.first()
+
+    suspend fun clearSeenPackages() {
+        context.dataStore.edit { it.remove(seenPackagesKey) }
+    }
+
+    /** Adiciona um pacote à lista monitorada (usado ao "adotar" um pacote descoberto). */
+    suspend fun addMonitoredPackage(pkg: String) {
+        context.dataStore.edit { prefs ->
+            val current = prefs[packagesKey]?.toMutableSet() ?: DEFAULT_PACKAGES.toMutableSet()
+            current.add(pkg)
+            prefs[packagesKey] = current
+        }
     }
 
     /** Salva os tipos da casa em cache local (cada item "id:nome"). */

@@ -32,6 +32,7 @@ class SetupActivity : AppCompatActivity() {
         }
         binding.refreshTypesBtn.setOnClickListener { refreshHouseTypes() }
         binding.testBtn.setOnClickListener { testFlow() }
+        binding.refreshSeenBtn.setOnClickListener { loadSeenPackages() }
 
         loadConfig()
     }
@@ -39,6 +40,53 @@ class SetupActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updateStatus()
+        loadSeenPackages()
+    }
+
+    /** Mostra os apps cujas notificações chegaram; tocar num deles passa a monitorá-lo. */
+    private fun loadSeenPackages() {
+        lifecycleScope.launch {
+            val seen = settings.seenPackages()
+            val monitored = settings.monitoredPackages()
+            if (seen.isEmpty()) {
+                binding.seenPackagesView.text = "(nenhuma notificação capturada ainda)"
+                return@launch
+            }
+            // Cada item guardado é "NomeApp|pacote".
+            val lines = seen.sorted().joinToString("\n") { entry ->
+                val parts = entry.split("|", limit = 2)
+                val label = parts.getOrElse(0) { entry }
+                val pkg = parts.getOrElse(1) { "" }
+                val mark = if (pkg in monitored) "✓ " else "• "
+                "$mark$label\n    $pkg"
+            }
+            binding.seenPackagesView.text = lines
+
+            // Toque no texto abre a escolha de qual pacote passar a monitorar.
+            binding.seenPackagesView.setOnClickListener { promptAdoptPackage(seen, monitored) }
+        }
+    }
+
+    private fun promptAdoptPackage(seen: Set<String>, monitored: Set<String>) {
+        val candidates = seen.map { it.split("|", limit = 2) }
+            .filter { it.size == 2 && it[1] !in monitored }
+        if (candidates.isEmpty()) {
+            Toast.makeText(this, "Todos os apps vistos já estão monitorados", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val labels = candidates.map { "${it[0]} (${it[1]})" }.toTypedArray()
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Monitorar qual app?")
+            .setItems(labels) { _, which ->
+                val pkg = candidates[which][1]
+                lifecycleScope.launch {
+                    settings.addMonitoredPackage(pkg)
+                    Toast.makeText(this@SetupActivity, "Agora monitorando ${candidates[which][0]}", Toast.LENGTH_SHORT).show()
+                    loadSeenPackages()
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
     }
 
     private fun loadConfig() {
@@ -96,15 +144,24 @@ class SetupActivity : AppCompatActivity() {
         return flat?.contains(packageName) == true
     }
 
-    /** Simula uma notificação de banco: injeta um texto direto na tela de classificação. */
+    /** Simula uma notificação: grava no Room (como o listener faz) e abre a classificação. */
     private fun testFlow() {
         val fakeText = "Compra aprovada: IFOOD *IFOOD no valor de R\$ 47,90"
-        val intent = Intent(this, ClassifyActivity::class.java).apply {
-            putExtra(ClassifyActivity.EXTRA_EXTERNAL_ID, "test-" + System.currentTimeMillis())
-            putExtra(ClassifyActivity.EXTRA_RAW_TEXT, fakeText)
-            putExtra(ClassifyActivity.EXTRA_PACKAGE, "com.nu.production")
-            putExtra(ClassifyActivity.EXTRA_TIMESTAMP, System.currentTimeMillis())
+        val externalId = "test-" + System.currentTimeMillis()
+        lifecycleScope.launch {
+            com.managehouse.ingest.data.AppDatabase.get(applicationContext).pendingTxDao().insert(
+                com.managehouse.ingest.data.PendingTx(
+                    externalId = externalId,
+                    rawText = fakeText,
+                    packageName = "test",
+                    timestamp = System.currentTimeMillis(),
+                    destination = null,
+                    classified = false
+                )
+            )
+            startActivity(Intent(this@SetupActivity, ClassifyActivity::class.java).apply {
+                putExtra(ClassifyActivity.EXTRA_EXTERNAL_ID, externalId)
+            })
         }
-        startActivity(intent)
     }
 }

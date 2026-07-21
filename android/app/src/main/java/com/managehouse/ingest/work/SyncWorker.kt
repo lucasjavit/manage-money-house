@@ -39,7 +39,8 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
                         rawText = tx.rawText,
                         timestamp = tx.timestamp,
                         packageName = tx.packageName,
-                        destination = tx.destination,
+                        // pending() só traz classified=true, então destination nunca é null aqui.
+                        destination = tx.destination ?: "personal",
                         expenseTypeId = tx.expenseTypeId,
                         amount = tx.amount,
                         description = tx.description

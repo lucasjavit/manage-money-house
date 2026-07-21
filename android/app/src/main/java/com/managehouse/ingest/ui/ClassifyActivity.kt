@@ -14,50 +14,53 @@ import com.managehouse.ingest.work.Sync
 import kotlinx.coroutines.launch
 
 /**
- * Tela disparada por cada notificação capturada. O usuário decide o destino:
- *  - "Meu gasto (Lucas)": transação pessoal, não vai à planilha da casa.
- *  - "Salvar na planilha da casa": usa o tipo escolhido no seletor (23 tipos, do cache local).
- * A tela NÃO extrai valor — encaminha o texto cru; a IA no backend faz o resto.
+ * Aberta pelo toque na notificação de captura. Carrega a PendingTx do Room (pelo externalId),
+ * o usuário escolhe o destino, e a linha é atualizada (classified = true) e enfileirada.
+ * A tela NÃO extrai valor — o texto cru vai ao backend, onde a IA faz o resto.
  */
 class ClassifyActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_EXTERNAL_ID = "externalId"
-        const val EXTRA_RAW_TEXT = "rawText"
-        const val EXTRA_PACKAGE = "package"
-        const val EXTRA_TIMESTAMP = "timestamp"
     }
 
     private lateinit var binding: ActivityClassifyBinding
-    private lateinit var externalId: String
-    private lateinit var rawText: String
-    private lateinit var pkg: String
-    private var timestamp: Long = 0
+    private var externalId: String = ""
+    private var current: PendingTx? = null
     private var houseTypes: List<Pair<Long, String>> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         externalId = intent.getStringExtra(EXTRA_EXTERNAL_ID) ?: run { finish(); return }
-        rawText = intent.getStringExtra(EXTRA_RAW_TEXT).orEmpty()
-        pkg = intent.getStringExtra(EXTRA_PACKAGE).orEmpty()
-        timestamp = intent.getLongExtra(EXTRA_TIMESTAMP, System.currentTimeMillis())
 
         binding = ActivityClassifyBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        binding.rawTextView.text = rawText
-
-        binding.personalBtn.setOnClickListener { save("personal", null) }
+        binding.personalBtn.setOnClickListener { classify("personal", null) }
         binding.saveHouseBtn.setOnClickListener {
             val idx = binding.typeSpinner.selectedItemPosition
             if (idx in houseTypes.indices) {
-                save("house", houseTypes[idx].first)
+                classify("house", houseTypes[idx].first)
             } else {
                 Toast.makeText(this, "Escolha um tipo", Toast.LENGTH_SHORT).show()
             }
         }
 
+        loadTransaction()
         loadHouseTypes()
+    }
+
+    private fun loadTransaction() {
+        lifecycleScope.launch {
+            current = AppDatabase.get(applicationContext).pendingTxDao().byId(externalId)
+            val tx = current
+            if (tx == null) {
+                Toast.makeText(this@ClassifyActivity, "Transação não encontrada", Toast.LENGTH_SHORT).show()
+                finish()
+                return@launch
+            }
+            binding.rawTextView.text = tx.rawText
+        }
     }
 
     private fun loadHouseTypes() {
@@ -77,20 +80,19 @@ class ClassifyActivity : AppCompatActivity() {
         }
     }
 
-    private fun save(destination: String, expenseTypeId: Long?) {
+    private fun classify(destination: String, expenseTypeId: Long?) {
+        val tx = current ?: return
         lifecycleScope.launch {
-            AppDatabase.get(applicationContext).pendingTxDao().insert(
-                PendingTx(
-                    externalId = externalId,
-                    rawText = rawText,
-                    packageName = pkg,
-                    timestamp = timestamp,
+            val dao = AppDatabase.get(applicationContext).pendingTxDao()
+            dao.update(
+                tx.copy(
                     destination = destination,
-                    expenseTypeId = expenseTypeId
+                    expenseTypeId = expenseTypeId,
+                    classified = true
                 )
             )
             Sync.enqueue(applicationContext)
-            Toast.makeText(applicationContext, "Salvo. Será enviado ao Pi.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(applicationContext, "Classificado. Será enviado ao Pi.", Toast.LENGTH_SHORT).show()
             finish()
         }
     }

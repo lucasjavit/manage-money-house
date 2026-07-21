@@ -36,6 +36,8 @@ class ManualEntryActivity : AppCompatActivity() {
             startActivity(Intent(this, SetupActivity::class.java))
         }
 
+        maybeRequestNotificationPermission()
+
         updateDateField()
         binding.dateField.setOnClickListener { pickDate() }
 
@@ -135,7 +137,8 @@ class ManualEntryActivity : AppCompatActivity() {
                     destination = if (isHouse) "house" else "personal",
                     expenseTypeId = expenseTypeId,
                     amount = amount,
-                    description = description
+                    description = description,
+                    classified = true   // registro manual já nasce classificado
                 )
             )
             Sync.enqueue(applicationContext)
@@ -147,5 +150,16 @@ class ManualEntryActivity : AppCompatActivity() {
     private fun clearForm() {
         binding.amountField.text?.clear()
         binding.descriptionField.text?.clear()
+    }
+
+    /** Android 13+: sem POST_NOTIFICATIONS, a notificação de "classificar gasto" não aparece. */
+    private fun maybeRequestNotificationPermission() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            val granted = checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (!granted) {
+                requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1001)
+            }
+        }
     }
 }
