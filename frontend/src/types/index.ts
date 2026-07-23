@@ -163,6 +163,52 @@ export interface BoletoProcessResponse {
   error?: string;
 }
 
+// PTO (aba Lucas - IT)
+export interface PtoConfig {
+  id: number;
+  userId: number;
+  baseDate: string;       // YYYY-MM-DD
+  initialBalance: number;
+  country: 'BR' | 'US';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PtoConfigRequest {
+  userId: number;
+  baseDate: string;
+  initialBalance: number;
+  country: 'BR' | 'US';
+}
+
+export interface PtoVacation {
+  id: number;
+  userId: number;
+  startDate: string;
+  endDate: string;
+  description?: string;
+  businessDaysUsed: number;
+  createdAt: string;
+}
+
+export interface PtoVacationRequest {
+  userId: number;
+  startDate: string;
+  endDate: string;
+  description?: string;
+}
+
+export interface PtoBalance {
+  date: string;
+  balance: number;
+  initialBalance: number;
+  accruedSinceBase: number;
+  usedVacationDays: number;
+  daysToNextPto: number;
+  fractionToNextPto: number;
+  country: 'BR' | 'US';
+}
+
 export interface SalaryDeduction {
   id: number;
   userId: number;
