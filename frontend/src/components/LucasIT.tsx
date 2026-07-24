@@ -134,7 +134,7 @@ const LucasIT = () => {
 
   return (
     <div className="max-w-3xl mx-auto p-6 space-y-6">
-      <h2 className="text-2xl font-bold text-slate-800">Lucas — IT · PTO (Aditi)</h2>
+      <h2 className="text-2xl font-bold text-slate-800">PTO Aditi</h2>
 
       {/* Saldo atual */}
       {hasConfig && balance && (
