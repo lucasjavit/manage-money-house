@@ -1,11 +1,16 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
+import { useAuth } from '../context/AuthContext'
 
 interface NavItem {
   path: string
   label: string
   icon: React.ReactNode
 }
+
+// Abas do grupo "Lucas": só o Lucas vê. Restrição visual (o backend segue aberto).
+const LUCAS_EMAIL = 'vyeiralucas@gmail.com'
+const LUCAS_PATHS = ['/extract', '/lucas-gastos', '/lucas-it', '/salary', '/investments']
 
 interface SidebarProps {
   isOpen?: boolean
@@ -15,8 +20,12 @@ interface SidebarProps {
 
 const Sidebar = ({ isOpen: controlledIsOpen, onClose, onToggle }: SidebarProps) => {
   const location = useLocation()
+  const { user } = useAuth()
   const [isOpen, setIsOpen] = useState(false)
-  
+  const isLucas = user?.email === LUCAS_EMAIL
+  // Grupo Lucas começa expandido se a rota atual for de uma das abas dele.
+  const [lucasOpen, setLucasOpen] = useState(() => LUCAS_PATHS.includes(location.pathname))
+
   const sidebarOpen = controlledIsOpen !== undefined ? controlledIsOpen : isOpen
   
   useEffect(() => {
@@ -224,30 +233,71 @@ const Sidebar = ({ isOpen: controlledIsOpen, onClose, onToggle }: SidebarProps) 
 
         {/* Navigation */}
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-          {navItems.map((item) => {
-            const active = isActive(item.path)
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                onClick={handleClose}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
-                  active
-                    ? 'bg-white/20 backdrop-blur-sm text-white shadow-md ring-2 ring-white/30'
-                    : 'text-white/80 hover:bg-white/10 hover:text-white'
-                }`}
-              >
-                <div
-                  className={`flex-shrink-0 ${
-                    active ? 'text-white' : 'text-white/70'
+          {(() => {
+            const renderLink = (item: NavItem) => {
+              const active = isActive(item.path)
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  onClick={handleClose}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+                    active
+                      ? 'bg-white/20 backdrop-blur-sm text-white shadow-md ring-2 ring-white/30'
+                      : 'text-white/80 hover:bg-white/10 hover:text-white'
                   }`}
                 >
-                  {item.icon}
-                </div>
-                <span className="font-medium">{item.label}</span>
-              </Link>
+                  <div className={`flex-shrink-0 ${active ? 'text-white' : 'text-white/70'}`}>
+                    {item.icon}
+                  </div>
+                  <span className="font-medium">{item.label}</span>
+                </Link>
+              )
+            }
+
+            const generalItems = navItems.filter((i) => !LUCAS_PATHS.includes(i.path))
+            const lucasItems = navItems.filter((i) => LUCAS_PATHS.includes(i.path))
+            // Item geral que fica logo após o grupo (Configurações), para o grupo entrar no meio.
+            const settings = generalItems.filter((i) => i.path === '/settings')
+            const topItems = generalItems.filter((i) => i.path !== '/settings')
+
+            return (
+              <>
+                {topItems.map(renderLink)}
+
+                {/* Grupo Lucas — retrátil, visível só para o Lucas */}
+                {isLucas && (
+                  <div>
+                    <button
+                      onClick={() => setLucasOpen((v) => !v)}
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition-all duration-200"
+                    >
+                      <div className="flex-shrink-0 text-white/70">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                      </div>
+                      <span className="font-medium flex-1 text-left">Lucas</span>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className={`h-4 w-4 transition-transform ${lucasOpen ? 'rotate-90' : ''}`}
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                    {lucasOpen && (
+                      <div className="ml-3 mt-1 pl-3 border-l border-white/20 space-y-1">
+                        {lucasItems.map(renderLink)}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {settings.map(renderLink)}
+              </>
             )
-          })}
+          })()}
         </nav>
       </div>
     </aside>
