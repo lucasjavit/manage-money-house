@@ -106,7 +106,7 @@ const Sidebar = ({ isOpen: controlledIsOpen, onClose, onToggle }: SidebarProps) 
     },
     {
       path: '/lucas-it',
-      label: 'Lucas - IT',
+      label: 'PTO Aditi',
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
