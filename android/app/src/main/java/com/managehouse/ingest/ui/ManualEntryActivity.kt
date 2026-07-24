@@ -92,9 +92,7 @@ class ManualEntryActivity : AppCompatActivity() {
     }
 
     private fun save() {
-        val amountText = binding.amountField.text?.toString()?.trim().orEmpty()
-            .replace(".", "").replace(",", ".")
-        val amount = amountText.toDoubleOrNull()
+        val amount = parseAmount(binding.amountField.text?.toString())
         if (amount == null || amount <= 0) {
             Toast.makeText(this, "Informe um valor válido", Toast.LENGTH_SHORT).show()
             return
@@ -145,6 +143,21 @@ class ManualEntryActivity : AppCompatActivity() {
             Toast.makeText(applicationContext, "Gasto salvo. Será enviado ao Pi.", Toast.LENGTH_SHORT).show()
             clearForm()
         }
+    }
+
+    /**
+     * Aceita "45,28" (pt-BR: vírgula decimal, ponto milhar) e "45.28" (ponto decimal).
+     * Regra: se há vírgula, ela é o decimal e pontos são milhares. Se só há ponto, ele é o decimal.
+     */
+    private fun parseAmount(raw: String?): Double? {
+        val text = raw?.trim().orEmpty()
+        if (text.isEmpty()) return null
+        val normalized = if (text.contains(",")) {
+            text.replace(".", "").replace(",", ".")
+        } else {
+            text
+        }
+        return normalized.toDoubleOrNull()
     }
 
     private fun clearForm() {

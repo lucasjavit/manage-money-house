@@ -1,12 +1,30 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <path
-        android:fillColor="#2E7D32"
-        android:pathData="M54,30a24,24 0,1 0,0.01 0zM54,38a16,16 0,1 1,-0.01 0zM52,44h4v20h-4z" />
-    <path
-        android:fillColor="#2E7D32"
-        android:pathData="M48,48h12v4h-12zM48,56h12v4h-12z" />
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <!--
+        Saco de dinheiro em branco. O SVG original (viewBox 512, com transform
+        translate(0,512) scale(0.1,-0.1)) é reproduzido por um group que espelha em Y
+        e reescala. Um segundo group centra e encolhe para a safe zone do adaptive icon.
+    -->
+    <group
+        android:scaleX="0.62"
+        android:scaleY="0.62"
+        android:pivotX="256"
+        android:pivotY="256">
+        <group
+            android:scaleX="0.1"
+            android:scaleY="-0.1"
+            android:translateY="512"
+            android:pivotX="0"
+            android:pivotY="0">
+            <path
+                android:fillColor="#FFFFFF"
+                android:pathData="M1943 5106 c-43 -20 -66 -58 -65 -109 1 -36 262 -930 275 -944 3 -3 43 5 89 16 197 50 439 51 632 1 44 -11 83 -17 87 -13 16 18 279 904 279 942 0 57 -48 110 -105 117 -36 5 -65 -8 -308 -136 l-267 -141 -258 136 c-141 75 -273 139 -292 141 -19 2 -49 -2 -67 -10z" />
+            <path
+                android:fillColor="#FFFFFF"
+                android:pathData="M2441 3939 c-527 -51 -1067 -493 -1442 -1180 -257 -471 -399 -978 -399 -1429 0 -368 82 -622 271 -837 293 -332 842 -493 1689 -493 1224 0 1825 329 1945 1065 22 132 19 407 -5 575 -124 865 -649 1738 -1266 2107 -187 111 -373 174 -572 193 -59 5 -114 9 -122 9 -8 -1 -53 -5 -99 -10z m230 -765 c45 -23 59 -67 59 -183 l0 -99 43 -6 c100 -15 303 -129 333 -187 17 -34 18 -76 1 -106 -7 -12 -43 -55 -80 -97 -90 -100 -105 -103 -219 -43 -99 52 -169 65 -256 48 -80 -15 -112 -51 -112 -126 0 -83 27 -107 233 -211 292 -147 397 -230 460 -362 43 -92 54 -193 35 -309 -37 -219 -167 -370 -381 -442 l-52 -18 -5 -114 c-3 -64 -11 -124 -18 -136 -21 -38 -64 -53 -153 -53 -79 0 -82 1 -115 34 l-34 34 0 106 c0 77 -4 108 -12 110 -7 2 -55 14 -107 26 -154 36 -318 116 -346 170 -24 46 -18 71 35 161 97 162 135 177 268 109 106 -54 188 -73 282 -68 115 7 157 37 173 126 9 46 -17 106 -62 141 -20 16 -109 67 -196 114 -209 110 -267 148 -343 223 -110 110 -152 237 -131 402 28 230 164 394 382 457 l57 16 0 113 c0 101 2 116 21 140 12 15 31 32 43 36 37 15 164 11 197 -6z" />
+        </group>
+    </group>
 </vector>
