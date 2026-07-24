@@ -29,6 +29,8 @@ const Sidebar = ({ isOpen: controlledIsOpen, onClose, onToggle }: SidebarProps) 
   // Grupos começam expandidos se a rota atual for de uma das abas contidas.
   const [lucasOpen, setLucasOpen] = useState(() => LUCAS_PATHS.includes(location.pathname))
   const [itOpen, setItOpen] = useState(() => LUCAS_IT_PATHS.includes(location.pathname))
+  const [empresasOpen, setEmpresasOpen] = useState(false)
+  const [aditiOpen, setAditiOpen] = useState(() => location.pathname === '/lucas-it')
 
   const sidebarOpen = controlledIsOpen !== undefined ? controlledIsOpen : isOpen
   
@@ -294,11 +296,24 @@ const Sidebar = ({ isOpen: controlledIsOpen, onClose, onToggle }: SidebarProps) 
                       <div className="ml-3 mt-1 pl-2 border-l border-white/20 space-y-1">
                         {/* Itens pessoais direto sob Lucas */}
                         {pessoalItems.map(renderLink)}
-                        {/* Sub-grupo Lucas It */}
+                        {/* Sub-grupo Lucas It, com Empresas (vazio) e Aditi */}
                         {groupToggle('Lucas It', itOpen, () => setItOpen((v) => !v))}
                         {itOpen && (
                           <div className="ml-3 pl-2 border-l border-white/15 space-y-1">
-                            {itItems.map(renderLink)}
+                            {/* Empresas (sem abas por enquanto) */}
+                            {groupToggle('Empresas', empresasOpen, () => setEmpresasOpen((v) => !v))}
+                            {empresasOpen && (
+                              <div className="ml-3 pl-2 border-l border-white/10">
+                                <span className="block px-4 py-2 text-sm text-white/40 italic">Nada por aqui ainda</span>
+                              </div>
+                            )}
+                            {/* Aditi */}
+                            {groupToggle('Aditi', aditiOpen, () => setAditiOpen((v) => !v))}
+                            {aditiOpen && (
+                              <div className="ml-3 pl-2 border-l border-white/10 space-y-1">
+                                {itItems.map(renderLink)}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
