@@ -8,9 +8,12 @@ interface NavItem {
   icon: React.ReactNode
 }
 
-// Abas do grupo "Lucas": só o Lucas vê. Restrição visual (o backend segue aberto).
+// Grupo "Lucas": só o Lucas vê. Restrição visual (o backend segue aberto).
+// Dividido em dois sub-grupos retráteis.
 const LUCAS_EMAIL = 'vyeiralucas@gmail.com'
-const LUCAS_PATHS = ['/extract', '/lucas-gastos', '/lucas-it', '/salary', '/investments']
+const PESSOAL_PATHS = ['/extract', '/lucas-gastos', '/salary', '/investments']
+const LUCAS_IT_PATHS = ['/lucas-it']
+const LUCAS_PATHS = [...PESSOAL_PATHS, ...LUCAS_IT_PATHS]
 
 interface SidebarProps {
   isOpen?: boolean
@@ -23,8 +26,10 @@ const Sidebar = ({ isOpen: controlledIsOpen, onClose, onToggle }: SidebarProps) 
   const { user } = useAuth()
   const [isOpen, setIsOpen] = useState(false)
   const isLucas = user?.email === LUCAS_EMAIL
-  // Grupo Lucas começa expandido se a rota atual for de uma das abas dele.
+  // Grupos começam expandidos se a rota atual for de uma das abas contidas.
   const [lucasOpen, setLucasOpen] = useState(() => LUCAS_PATHS.includes(location.pathname))
+  const [pessoalOpen, setPessoalOpen] = useState(() => PESSOAL_PATHS.includes(location.pathname))
+  const [itOpen, setItOpen] = useState(() => LUCAS_IT_PATHS.includes(location.pathname))
 
   const sidebarOpen = controlledIsOpen !== undefined ? controlledIsOpen : isOpen
   
@@ -255,9 +260,26 @@ const Sidebar = ({ isOpen: controlledIsOpen, onClose, onToggle }: SidebarProps) 
               )
             }
 
+            // Botão de grupo retrátil (usado para "Lucas", "Pessoal" e "Lucas It").
+            const groupToggle = (label: string, open: boolean, toggle: () => void) => (
+              <button
+                onClick={toggle}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition-all duration-200"
+              >
+                <span className="font-medium flex-1 text-left">{label}</span>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className={`h-4 w-4 transition-transform ${open ? 'rotate-90' : ''}`}
+                  fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            )
+
             const generalItems = navItems.filter((i) => !LUCAS_PATHS.includes(i.path))
-            const lucasItems = navItems.filter((i) => LUCAS_PATHS.includes(i.path))
-            // Item geral que fica logo após o grupo (Configurações), para o grupo entrar no meio.
+            const pessoalItems = navItems.filter((i) => PESSOAL_PATHS.includes(i.path))
+            const itItems = navItems.filter((i) => LUCAS_IT_PATHS.includes(i.path))
             const settings = generalItems.filter((i) => i.path === '/settings')
             const topItems = generalItems.filter((i) => i.path !== '/settings')
 
@@ -265,30 +287,26 @@ const Sidebar = ({ isOpen: controlledIsOpen, onClose, onToggle }: SidebarProps) 
               <>
                 {topItems.map(renderLink)}
 
-                {/* Grupo Lucas — retrátil, visível só para o Lucas */}
+                {/* Grupo Lucas — retrátil, visível só para o Lucas, com sub-grupos */}
                 {isLucas && (
                   <div>
-                    <button
-                      onClick={() => setLucasOpen((v) => !v)}
-                      className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition-all duration-200"
-                    >
-                      <div className="flex-shrink-0 text-white/70">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                      </div>
-                      <span className="font-medium flex-1 text-left">Lucas</span>
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className={`h-4 w-4 transition-transform ${lucasOpen ? 'rotate-90' : ''}`}
-                        fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </button>
+                    {groupToggle('Lucas', lucasOpen, () => setLucasOpen((v) => !v))}
                     {lucasOpen && (
-                      <div className="ml-3 mt-1 pl-3 border-l border-white/20 space-y-1">
-                        {lucasItems.map(renderLink)}
+                      <div className="ml-3 mt-1 pl-2 border-l border-white/20 space-y-1">
+                        {/* Sub-grupo Pessoal */}
+                        {groupToggle('Pessoal', pessoalOpen, () => setPessoalOpen((v) => !v))}
+                        {pessoalOpen && (
+                          <div className="ml-3 pl-2 border-l border-white/15 space-y-1">
+                            {pessoalItems.map(renderLink)}
+                          </div>
+                        )}
+                        {/* Sub-grupo Lucas It */}
+                        {groupToggle('Lucas It', itOpen, () => setItOpen((v) => !v))}
+                        {itOpen && (
+                          <div className="ml-3 pl-2 border-l border-white/15 space-y-1">
+                            {itItems.map(renderLink)}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
