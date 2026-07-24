@@ -28,7 +28,6 @@ const Sidebar = ({ isOpen: controlledIsOpen, onClose, onToggle }: SidebarProps) 
   const isLucas = user?.email === LUCAS_EMAIL
   // Grupos começam expandidos se a rota atual for de uma das abas contidas.
   const [lucasOpen, setLucasOpen] = useState(() => LUCAS_PATHS.includes(location.pathname))
-  const [pessoalOpen, setPessoalOpen] = useState(() => PESSOAL_PATHS.includes(location.pathname))
   const [itOpen, setItOpen] = useState(() => LUCAS_IT_PATHS.includes(location.pathname))
 
   const sidebarOpen = controlledIsOpen !== undefined ? controlledIsOpen : isOpen
@@ -293,13 +292,8 @@ const Sidebar = ({ isOpen: controlledIsOpen, onClose, onToggle }: SidebarProps) 
                     {groupToggle('Lucas', lucasOpen, () => setLucasOpen((v) => !v))}
                     {lucasOpen && (
                       <div className="ml-3 mt-1 pl-2 border-l border-white/20 space-y-1">
-                        {/* Sub-grupo Pessoal */}
-                        {groupToggle('Pessoal', pessoalOpen, () => setPessoalOpen((v) => !v))}
-                        {pessoalOpen && (
-                          <div className="ml-3 pl-2 border-l border-white/15 space-y-1">
-                            {pessoalItems.map(renderLink)}
-                          </div>
-                        )}
+                        {/* Itens pessoais direto sob Lucas */}
+                        {pessoalItems.map(renderLink)}
                         {/* Sub-grupo Lucas It */}
                         {groupToggle('Lucas It', itOpen, () => setItOpen((v) => !v))}
                         {itOpen && (
