@@ -100,12 +100,12 @@ public class AssetPriceService {
             return cached.price;
         }
 
-        // Tentar Google Finance primeiro
-        Double price = fetchFromGoogleFinance(ticker);
+        // Yahoo Finance é a fonte primária (o scraping do Google Finance ficou instável).
+        Double price = fetchFromYahoo(ticker);
 
-        // Fallback para Yahoo Finance
+        // Fallback para Google Finance se o Yahoo falhar.
         if (price == null) {
-            price = fetchFromYahoo(ticker);
+            price = fetchFromGoogleFinance(ticker);
         }
 
         if (price != null) {
@@ -161,8 +161,13 @@ public class AssetPriceService {
             String url = "https://query1.finance.yahoo.com/v8/finance/chart/" + yahooTicker + "?interval=1d&range=1d";
 
             log.debug("Buscando preço de {} via Yahoo Finance", yahooTicker);
-            String response = restTemplate.getForObject(url, String.class);
-            JsonNode root = objectMapper.readTree(response);
+            // Yahoo bloqueia requisições sem User-Agent de navegador (retorna HTML de erro).
+            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+            headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36");
+            org.springframework.http.ResponseEntity<String> resp = restTemplate.exchange(
+                    url, org.springframework.http.HttpMethod.GET,
+                    new org.springframework.http.HttpEntity<>(headers), String.class);
+            JsonNode root = objectMapper.readTree(resp.getBody());
 
             JsonNode chart = root.path("chart").path("result");
             if (chart.isArray() && chart.size() > 0) {
