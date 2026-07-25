@@ -1,6 +1,7 @@
 import type { AssetAnalysis } from '../types';
 
-const API_URL = 'http://localhost:8080/api/market';
+// Caminho relativo: passa pelo proxy do nginx e funciona de qualquer dispositivo da rede.
+const API_URL = '/api/market';
 
 export const investmentService = {
   async getAssetAnalysis(ticker: string, portfolioType: string): Promise<AssetAnalysis> {
