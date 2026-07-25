@@ -35,6 +35,7 @@ const LucasExpenses = () => {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<number | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [editDesc, setEditDesc] = useState('');
   const confirm = useConfirm();
 
   const load = async () => {
@@ -67,6 +68,31 @@ const LucasExpenses = () => {
       await bankTransactionService.update(id, { amount: num });
       setEditing(null);
       setEditValue('');
+      await load();
+    } catch (e) {
+      console.error(e);
+      alert('Erro ao salvar');
+    }
+  };
+
+  const startEdit = (tx: BankTransaction) => {
+    setEditing(tx.id);
+    setEditValue(tx.amount != null ? String(tx.amount).replace('.', ',') : '');
+    setEditDesc(tx.description ?? '');
+  };
+
+  // Salva valor + descrição de um gasto já feito (edição na lista).
+  const saveEdit = async (id: number) => {
+    const num = parseFloat(editValue.replace(',', '.'));
+    if (isNaN(num) || num <= 0) {
+      alert('Informe um valor válido');
+      return;
+    }
+    try {
+      await bankTransactionService.update(id, { amount: num, description: editDesc.trim() });
+      setEditing(null);
+      setEditValue('');
+      setEditDesc('');
       await load();
     } catch (e) {
       console.error(e);
@@ -203,24 +229,62 @@ const LucasExpenses = () => {
               {done.map((tx, idx) => (
                 <div
                   key={tx.id}
-                  className={`flex items-center gap-3 px-5 py-4 group ${
-                    idx > 0 ? 'border-t border-slate-100' : ''
-                  }`}
+                  className={`px-5 py-4 group ${idx > 0 ? 'border-t border-slate-100' : ''}`}
                 >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-slate-800 truncate">{tx.description}</p>
-                    <p className="text-xs text-slate-400">{formatDateTime(tx.createdAt)}</p>
-                  </div>
-                  <span className="text-sm font-bold text-slate-800 shrink-0">
-                    {formatCurrency(tx.amount ?? 0)}
-                  </span>
-                  <button
-                    onClick={() => remove(tx.id)}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-300 hover:text-red-600 text-lg font-bold shrink-0"
-                    title="Excluir"
-                  >
-                    ×
-                  </button>
+                  {editing === tx.id ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        type="text"
+                        value={editDesc}
+                        onChange={(e) => setEditDesc(e.target.value)}
+                        placeholder="Descrição"
+                        className="flex-1 min-w-[120px] px-3 py-1.5 text-sm border-2 border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400/50 bg-white"
+                      />
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        placeholder="0,00"
+                        className="w-24 px-3 py-1.5 text-sm border-2 border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400/50 bg-white"
+                      />
+                      <button
+                        onClick={() => saveEdit(tx.id)}
+                        className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700"
+                      >
+                        Salvar
+                      </button>
+                      <button
+                        onClick={() => { setEditing(null); setEditValue(''); setEditDesc(''); }}
+                        className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-800"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-slate-800 truncate">{tx.description}</p>
+                        <p className="text-xs text-slate-400">{formatDateTime(tx.createdAt)}</p>
+                      </div>
+                      <span className="text-sm font-bold text-slate-800 shrink-0">
+                        {formatCurrency(tx.amount ?? 0)}
+                      </span>
+                      <button
+                        onClick={() => startEdit(tx)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-xs font-medium text-blue-600 hover:text-blue-800 shrink-0"
+                      >
+                        editar
+                      </button>
+                      <button
+                        onClick={() => remove(tx.id)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-300 hover:text-red-600 text-lg font-bold shrink-0"
+                        title="Excluir"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
