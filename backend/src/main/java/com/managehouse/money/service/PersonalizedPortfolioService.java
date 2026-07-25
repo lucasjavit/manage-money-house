@@ -280,27 +280,27 @@ public class PersonalizedPortfolioService {
 
         // Selecao value investing: renda fixa em TODOS os perfis, pouco especulativo.
         switch (riskProfile.toUpperCase()) {
+            // ~12 ativos: diversificacao suficiente sem virar indice (consenso 12-18 papeis).
             case "CONSERVADOR":
-                addAssetsByType(selectedAssets, byType, "Renda Fixa", 2, 25); // 50%
-                addAssetsByType(selectedAssets, byType, "FII", 3, 10);         // 30%
-                addAssetsByType(selectedAssets, byType, "Acao", 2, 10);        // 20%
+                addAssetsByType(selectedAssets, byType, "Renda Fixa", 3, 17); // ~50%
+                addAssetsByType(selectedAssets, byType, "FII", 5, 6);          // ~30%
+                addAssetsByType(selectedAssets, byType, "Acao", 4, 5);         // ~20%
                 break;
             case "MODERADO":
                 addAssetsByType(selectedAssets, byType, "Renda Fixa", 2, 15);  // 30%
-                addAssetsByType(selectedAssets, byType, "Acao", 3, 10);        // 30% valor
-                addAssetsByType(selectedAssets, byType, "FII", 2, 12);         // 25%
-                addAssetsByType(selectedAssets, byType, "Acao", 1, 15);        // 15% dividendos
+                addAssetsByType(selectedAssets, byType, "Acao", 5, 9);         // ~45% (valor+dividendos)
+                addAssetsByType(selectedAssets, byType, "FII", 4, 6);          // ~25%
                 break;
             case "ARROJADO":
                 addAssetsByType(selectedAssets, byType, "Renda Fixa", 1, 15);  // 15%
-                addAssetsByType(selectedAssets, byType, "Acao", 4, 10);        // 40% valor
-                addAssetsByType(selectedAssets, byType, "FII", 2, 10);         // 20%
-                addAssetsByType(selectedAssets, byType, "ETF", 1, 10);         // 10% internacional
+                addAssetsByType(selectedAssets, byType, "Acao", 6, 8);         // ~48%
+                addAssetsByType(selectedAssets, byType, "FII", 3, 7);          // ~21%
+                addAssetsByType(selectedAssets, byType, "ETF", 2, 8);          // ~16%
                 break;
             default:
                 addAssetsByType(selectedAssets, byType, "Renda Fixa", 2, 15);
-                addAssetsByType(selectedAssets, byType, "Acao", 4, 12);
-                addAssetsByType(selectedAssets, byType, "FII", 2, 12);
+                addAssetsByType(selectedAssets, byType, "Acao", 6, 9);
+                addAssetsByType(selectedAssets, byType, "FII", 4, 6);
         }
 
         // Renumerar ranks

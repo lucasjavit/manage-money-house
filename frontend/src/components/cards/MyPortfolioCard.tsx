@@ -10,6 +10,11 @@ interface MyPortfolioCardProps {
 
 const MyPortfolioCard: React.FC<MyPortfolioCardProps> = ({ portfolio, onRegenerate }) => {
   const [selectedAsset, setSelectedAsset] = useState<RecommendedAsset | null>(null);
+  const [investInput, setInvestInput] = useState('');
+
+  const investAmount = parseFloat(investInput.replace(/\./g, '').replace(',', '.')) || 0;
+  const fmtBRL = (v: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 
   // Separar ativos em bom preco vs acima do teto
   const recommendedAssets = portfolio.recommendedAssets || [];
@@ -124,6 +129,65 @@ const MyPortfolioCard: React.FC<MyPortfolioCardProps> = ({ portfolio, onRegenera
             ))}
           </div>
         )}
+      </div>
+
+      {/* Distribuição de um valor pelos ativos */}
+      <div className="bg-white rounded-xl p-6 border border-indigo-200 shadow-sm">
+        <h4 className="text-lg font-semibold text-indigo-700 mb-3">Simular aporte</h4>
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          <span className="text-sm text-gray-600">Quanto você quer investir?</span>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={investInput}
+            onChange={(e) => setInvestInput(e.target.value)}
+            placeholder="10.000,00"
+            className="w-40 px-3 py-2 text-sm border-2 border-indigo-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/50"
+          />
+        </div>
+        {investAmount > 0 && (() => {
+          const totalAlloc = goodPriceAssets.reduce((s, a) => s + (a.targetAllocation || 0), 0) || 1;
+          let usado = 0;
+          const rows = goodPriceAssets.map((a) => {
+            const valor = (investAmount * (a.targetAllocation || 0)) / totalAlloc;
+            const temPreco = a.currentPrice != null && a.currentPrice > 0;
+            const qtde = temPreco ? Math.floor(valor / (a.currentPrice as number)) : null;
+            const aplicado = temPreco ? (qtde as number) * (a.currentPrice as number) : valor;
+            usado += aplicado;
+            return { a, valor, qtde, aplicado };
+          });
+          const sobra = investAmount - usado;
+          return (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-gray-500 uppercase border-b">
+                    <th className="py-2 pr-3">Ativo</th>
+                    <th className="py-2 pr-3 text-right">%</th>
+                    <th className="py-2 pr-3 text-right">Destinar</th>
+                    <th className="py-2 pr-3 text-right">Qtde</th>
+                    <th className="py-2 text-right">Aplicado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(({ a, valor, qtde, aplicado }) => (
+                    <tr key={a.ticker} className="border-b last:border-0">
+                      <td className="py-2 pr-3 font-medium text-gray-800">{a.ticker}</td>
+                      <td className="py-2 pr-3 text-right text-gray-600">{a.targetAllocation}%</td>
+                      <td className="py-2 pr-3 text-right">{fmtBRL(valor)}</td>
+                      <td className="py-2 pr-3 text-right">{qtde != null ? qtde : '—'}</td>
+                      <td className="py-2 text-right font-semibold">{fmtBRL(aplicado)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="text-xs text-gray-500 mt-3">
+                Sobra em caixa (cotas inteiras): <strong>{fmtBRL(sobra)}</strong>.
+                Renda fixa não tem cotação — o valor destinado é aplicado direto.
+              </p>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Assets - Good Price */}
