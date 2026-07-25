@@ -749,4 +749,5 @@ export interface BankTransaction {
   sourcePackage: string | null;
   rawText: string | null;
   needsReview: boolean;
+  createdAt: string; // data+hora do registro (ISO)
 }

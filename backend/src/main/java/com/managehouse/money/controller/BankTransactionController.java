@@ -80,7 +80,8 @@ public class BankTransactionController {
                 b.getTransactionDate(),
                 b.getSourcePackage(),
                 b.getRawText(),
-                b.isNeedsReview());
+                b.isNeedsReview(),
+                b.getCreatedAt());
     }
 
     public record UpdateRequest(BigDecimal amount, String description) {}

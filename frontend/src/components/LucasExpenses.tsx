@@ -18,6 +18,15 @@ const formatDate = (iso: string) => {
   return `${d}/${m}/${y}`;
 };
 
+// Data + hora do registro (createdAt ISO, ex: "2026-07-24T14:32:05").
+const formatDateTime = (iso: string) => {
+  if (!iso) return '';
+  const [datePart, timePart] = iso.split('T');
+  const [y, m, d] = datePart.split('-');
+  const hhmm = timePart ? timePart.slice(0, 5) : '';
+  return `${d}/${m}/${y}${hhmm ? ` às ${hhmm}` : ''}`;
+};
+
 const LucasExpenses = () => {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -176,7 +185,7 @@ const LucasExpenses = () => {
                           </button>
                         </>
                       )}
-                      <span className="ml-auto text-xs text-slate-400">{formatDate(tx.transactionDate)}</span>
+                      <span className="ml-auto text-xs text-slate-400">{formatDateTime(tx.createdAt)}</span>
                     </div>
                   </div>
                 ))}
@@ -200,7 +209,7 @@ const LucasExpenses = () => {
                 >
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-slate-800 truncate">{tx.description}</p>
-                    <p className="text-xs text-slate-400">{formatDate(tx.transactionDate)}</p>
+                    <p className="text-xs text-slate-400">{formatDateTime(tx.createdAt)}</p>
                   </div>
                   <span className="text-sm font-bold text-slate-800 shrink-0">
                     {formatCurrency(tx.amount ?? 0)}

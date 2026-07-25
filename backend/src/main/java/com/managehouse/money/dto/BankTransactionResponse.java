@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Data
 @NoArgsConstructor
@@ -18,4 +19,5 @@ public class BankTransactionResponse {
     private String sourcePackage;
     private String rawText;
     private boolean needsReview;
+    private LocalDateTime createdAt; // data+hora em que foi registrado
 }
