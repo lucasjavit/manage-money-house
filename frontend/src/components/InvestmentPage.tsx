@@ -437,8 +437,12 @@ const InvestmentPage = () => {
             <>
               <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
                 <p className="text-teal-800 text-sm">
-                  <strong>🤖 Carteira gerada por IA:</strong> Esta carteira foi montada automaticamente
-                  selecionando os melhores ativos das nossas carteiras recomendadas baseado no seu perfil.
+                  <strong>📊 Carteira value investing:</strong> montada com princípios de Warren Buffett /
+                  Graham — margem de segurança, qualidade e longo prazo — sempre com uma fatia de renda fixa
+                  conforme o perfil.
+                </p>
+                <p className="text-teal-700 text-xs mt-2">
+                  Conteúdo educativo. Não é recomendação de investimento; as decisões são suas.
                 </p>
               </div>
               <MyPortfolioCard

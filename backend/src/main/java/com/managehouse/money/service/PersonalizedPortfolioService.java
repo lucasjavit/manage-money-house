@@ -146,31 +146,46 @@ public class PersonalizedPortfolioService {
         }
 
         return String.format("""
-            Voce e um consultor de investimentos brasileiro certificado (CNPI).
+            Voce raciocina como um investidor de VALOR na linha de Warren Buffett e Benjamin Graham.
+            Filosofia (aplique como criterio central):
+            - MARGEM DE SEGURANCA: prefira ativos com preco atual bem ABAIXO do valor justo/teto.
+            - QUALIDADE E PREVISIBILIDADE: empresas/FIIs com fundamentos solidos, historico consistente,
+              baixo endividamento e vantagem competitiva duravel ("moat").
+            - LONGO PRAZO: carteira para segurar por anos, nao para especular.
+            - CIRCULO DE COMPETENCIA: evite o que e complexo/imprevisivel demais; peso baixo em
+              ativos especulativos (cripto, small caps sem lucro) mesmo no perfil arrojado.
+            - "Preco e o que voce paga, valor e o que voce leva": DY alto so importa se for sustentavel.
 
-            Monte uma carteira de investimentos com perfil %s usando os MELHORES ativos da lista abaixo.
+            Monte uma carteira com perfil %s usando os MELHORES ativos da lista abaixo, sob essa filosofia.
 
-            REGRAS POR PERFIL:
-            - CONSERVADOR: 60%% FIIs + 30%% Acoes de Dividendos + 10%% Renda Fixa (8-10 ativos total)
-            - MODERADO: 40%% Acoes de Valor + 30%% FIIs + 20%% Acoes de Dividendos + 10%% Cripto (10-12 ativos total)
-            - ARROJADO: 40%% Acoes + 25%% Small Caps + 20%% Cripto + 15%% ETFs Internacionais (10-12 ativos total)
+            ALOCACAO POR PERFIL (inclua SEMPRE uma fatia de Renda Fixa):
+            - CONSERVADOR: 50%% Renda Fixa + 30%% FIIs + 20%% Acoes de Dividendos de qualidade.
+            - MODERADO: 30%% Renda Fixa + 30%% Acoes de Valor + 25%% FIIs + 15%% Acoes de Dividendos.
+            - ARROJADO: 15%% Renda Fixa + 40%% Acoes de Valor + 20%% FIIs + 15%% Small Caps de qualidade + 10%% Internacional.
 
-            CRITERIOS DE SELECAO (em ordem de prioridade):
-            1. Priorizar ativos com preco atual ABAIXO do teto
-            2. Maior Dividend Yield esperado (para FIIs e acoes de dividendos)
-            3. Diversificacao setorial (nao concentrar em um setor)
-            4. Fundamentos solidos (conforme rationale)
+            RENDA FIXA (a fatia acima): distribua entre os tipos e explique a logica no reason:
+            - Tesouro Selic: reserva de oportunidade e liquidez (parte da fatia).
+            - Tesouro IPCA+ / CDB IPCA+: proteger poder de compra no longo prazo.
+            - CDB/LCI/LCA (% do CDI): renda previsivel; LCI/LCA isentas de IR.
+            Represente a renda fixa como itens com ticker "RENDA-FIXA" (ou o ticker do ativo de RF se houver na lista),
+            somando ao percentual do perfil.
+
+            CRITERIOS DE SELECAO (ordem de prioridade):
+            1. Margem de seguranca: preco atual ABAIXO do teto (descarte os muito acima do teto).
+            2. Qualidade dos fundamentos (conforme rationale) e previsibilidade.
+            3. Diversificacao setorial (nao concentrar).
+            4. DY sustentavel para a parte de dividendos/FIIs.
 
             ATIVOS DISPONIVEIS:
             %s
 
-            IMPORTANTE: Responda APENAS com JSON valido, sem markdown:
+            IMPORTANTE: os percentuais de selectedAssets DEVEM somar 100. Responda APENAS com JSON valido, sem markdown:
             {
               "selectedAssets": [
-                {"ticker": "TICKER1", "allocation": 10, "reason": "Motivo da selecao"},
-                {"ticker": "TICKER2", "allocation": 10, "reason": "Motivo da selecao"}
+                {"ticker": "RENDA-FIXA", "allocation": 50, "reason": "Tesouro Selic (reserva) + IPCA+ (longo prazo)"},
+                {"ticker": "TICKER1", "allocation": 10, "reason": "Margem de seguranca: preco abaixo do teto, fundamentos solidos"}
               ],
-              "portfolioRationale": "Explicacao geral de 2-3 frases sobre a estrategia da carteira",
+              "portfolioRationale": "Explicacao de 2-3 frases sob a otica de value investing (margem de seguranca, qualidade, longo prazo)",
               "expectedDY": 8.5,
               "riskAssessment": "Avaliacao de risco em 1-2 frases"
             }
@@ -261,29 +276,29 @@ public class PersonalizedPortfolioService {
         Map<String, List<RecommendedAsset>> byType = assets.stream()
                 .collect(Collectors.groupingBy(RecommendedAsset::getType));
 
-        // Selecionar baseado no perfil
+        // Selecao value investing: renda fixa em TODOS os perfis, pouco especulativo.
         switch (riskProfile.toUpperCase()) {
             case "CONSERVADOR":
-                addAssetsByType(selectedAssets, byType, "FII", 6, 10);
-                addAssetsByType(selectedAssets, byType, "Acao", 3, 10);
-                addAssetsByType(selectedAssets, byType, "Renda Fixa", 1, 10);
+                addAssetsByType(selectedAssets, byType, "Renda Fixa", 2, 25); // 50%
+                addAssetsByType(selectedAssets, byType, "FII", 3, 10);         // 30%
+                addAssetsByType(selectedAssets, byType, "Acao", 2, 10);        // 20%
                 break;
             case "MODERADO":
-                addAssetsByType(selectedAssets, byType, "Acao", 4, 10);
-                addAssetsByType(selectedAssets, byType, "FII", 3, 10);
-                addAssetsByType(selectedAssets, byType, "Acao", 2, 10);
-                addAssetsByType(selectedAssets, byType, "Cripto", 1, 10);
+                addAssetsByType(selectedAssets, byType, "Renda Fixa", 2, 15);  // 30%
+                addAssetsByType(selectedAssets, byType, "Acao", 3, 10);        // 30% valor
+                addAssetsByType(selectedAssets, byType, "FII", 2, 12);         // 25%
+                addAssetsByType(selectedAssets, byType, "Acao", 1, 15);        // 15% dividendos
                 break;
             case "ARROJADO":
-                addAssetsByType(selectedAssets, byType, "Acao", 4, 10);
-                addAssetsByType(selectedAssets, byType, "Acao", 3, 8);
-                addAssetsByType(selectedAssets, byType, "Cripto", 2, 10);
-                addAssetsByType(selectedAssets, byType, "ETF", 2, 7);
+                addAssetsByType(selectedAssets, byType, "Renda Fixa", 1, 15);  // 15%
+                addAssetsByType(selectedAssets, byType, "Acao", 4, 10);        // 40% valor
+                addAssetsByType(selectedAssets, byType, "FII", 2, 10);         // 20%
+                addAssetsByType(selectedAssets, byType, "ETF", 1, 10);         // 10% internacional
                 break;
             default:
-                addAssetsByType(selectedAssets, byType, "Acao", 5, 10);
-                addAssetsByType(selectedAssets, byType, "FII", 3, 10);
-                addAssetsByType(selectedAssets, byType, "Cripto", 2, 10);
+                addAssetsByType(selectedAssets, byType, "Renda Fixa", 2, 15);
+                addAssetsByType(selectedAssets, byType, "Acao", 4, 12);
+                addAssetsByType(selectedAssets, byType, "FII", 2, 12);
         }
 
         // Renumerar ranks
@@ -343,29 +358,30 @@ public class PersonalizedPortfolioService {
         switch (riskProfile.toUpperCase()) {
             case "CONSERVADOR":
                 return Arrays.asList(
-                        PortfolioAsset.builder().type("FIIs").percentage(60).description("Fundos Imobiliarios").build(),
-                        PortfolioAsset.builder().type("Acoes").percentage(30).description("Acoes de Dividendos").build(),
-                        PortfolioAsset.builder().type("Renda Fixa").percentage(10).description("Tesouro/CDBs").build()
+                        PortfolioAsset.builder().type("Renda Fixa").percentage(50).description("Tesouro Selic/IPCA+, CDB, LCI/LCA").build(),
+                        PortfolioAsset.builder().type("FIIs").percentage(30).description("Fundos Imobiliarios de qualidade").build(),
+                        PortfolioAsset.builder().type("Dividendos").percentage(20).description("Acoes pagadoras consistentes").build()
                 );
             case "MODERADO":
                 return Arrays.asList(
-                        PortfolioAsset.builder().type("Acoes").percentage(40).description("Acoes de Valor").build(),
-                        PortfolioAsset.builder().type("FIIs").percentage(30).description("Fundos Imobiliarios").build(),
-                        PortfolioAsset.builder().type("Dividendos").percentage(20).description("Acoes de Dividendos").build(),
-                        PortfolioAsset.builder().type("Cripto").percentage(10).description("Criptomoedas").build()
+                        PortfolioAsset.builder().type("Renda Fixa").percentage(30).description("Tesouro IPCA+, CDB, LCI/LCA").build(),
+                        PortfolioAsset.builder().type("Acoes").percentage(30).description("Acoes de Valor (margem de seguranca)").build(),
+                        PortfolioAsset.builder().type("FIIs").percentage(25).description("Fundos Imobiliarios").build(),
+                        PortfolioAsset.builder().type("Dividendos").percentage(15).description("Acoes de Dividendos").build()
                 );
             case "ARROJADO":
                 return Arrays.asList(
-                        PortfolioAsset.builder().type("Acoes").percentage(40).description("Acoes Crescimento").build(),
-                        PortfolioAsset.builder().type("Small Caps").percentage(25).description("Empresas Menores").build(),
-                        PortfolioAsset.builder().type("Cripto").percentage(20).description("Criptomoedas").build(),
-                        PortfolioAsset.builder().type("Internacional").percentage(15).description("ETFs Globais").build()
+                        PortfolioAsset.builder().type("Renda Fixa").percentage(15).description("Tesouro Selic (reserva de oportunidade)").build(),
+                        PortfolioAsset.builder().type("Acoes").percentage(40).description("Acoes de Valor").build(),
+                        PortfolioAsset.builder().type("FIIs").percentage(20).description("Fundos Imobiliarios").build(),
+                        PortfolioAsset.builder().type("Small Caps").percentage(15).description("Empresas menores de qualidade").build(),
+                        PortfolioAsset.builder().type("Internacional").percentage(10).description("ETFs Globais").build()
                 );
             default:
                 return Arrays.asList(
-                        PortfolioAsset.builder().type("Acoes").percentage(50).description("Acoes").build(),
-                        PortfolioAsset.builder().type("FIIs").percentage(30).description("FIIs").build(),
-                        PortfolioAsset.builder().type("Cripto").percentage(20).description("Cripto").build()
+                        PortfolioAsset.builder().type("Renda Fixa").percentage(30).description("Tesouro/CDB").build(),
+                        PortfolioAsset.builder().type("Acoes").percentage(45).description("Acoes de Valor").build(),
+                        PortfolioAsset.builder().type("FIIs").percentage(25).description("FIIs").build()
                 );
         }
     }
