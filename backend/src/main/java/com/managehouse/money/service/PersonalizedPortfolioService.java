@@ -272,9 +272,11 @@ public class PersonalizedPortfolioService {
     private InvestmentPortfolio generateBasicPortfolio(List<RecommendedAsset> assets, String riskProfile) {
         List<RecommendedAsset> selectedAssets = new ArrayList<>();
 
-        // Agrupar por tipo
+        // Agrupar por tipo NORMALIZADO: as carteiras estáticas usam variações
+        // ("Ação", "Ações", "FIIs", "Tesouro", "CDBs"...) que não casavam com as
+        // chaves do switch e deixavam a carteira sem ações.
         Map<String, List<RecommendedAsset>> byType = assets.stream()
-                .collect(Collectors.groupingBy(RecommendedAsset::getType));
+                .collect(Collectors.groupingBy(a -> normalizeAssetType(a.getType())));
 
         // Selecao value investing: renda fixa em TODOS os perfis, pouco especulativo.
         switch (riskProfile.toUpperCase()) {
@@ -316,6 +318,22 @@ public class PersonalizedPortfolioService {
                 .recommendedAssets(selectedAssets)
                 .characteristics(getCharacteristics(riskProfile))
                 .build();
+    }
+
+    /** Mapeia as variações de tipo das carteiras estáticas para as chaves canônicas do fallback. */
+    private String normalizeAssetType(String type) {
+        if (type == null) return "Outro";
+        String t = java.text.Normalizer.normalize(type, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")   // remove acentos
+                .toLowerCase().trim();
+        if (t.startsWith("acao") || t.startsWith("acoes") || t.equals("mid caps")) return "Acao";
+        if (t.equals("small caps")) return "Small Caps";
+        if (t.startsWith("fii")) return "FII";
+        if (t.startsWith("etf") || t.equals("reits")) return "ETF";
+        if (t.startsWith("cripto") || t.equals("bitcoin") || t.equals("ethereum")
+                || t.startsWith("altcoin") || t.startsWith("stablecoin")) return "Cripto";
+        if (t.equals("renda fixa") || t.equals("tesouro") || t.startsWith("cdb") || t.startsWith("lci")) return "Renda Fixa";
+        return type;
     }
 
     private void addAssetsByType(List<RecommendedAsset> selected, Map<String, List<RecommendedAsset>> byType,
