@@ -209,6 +209,44 @@ export interface PtoBalance {
   country: 'BR' | 'US';
 }
 
+// Empresas (Lucas It > Empresas): contas e impostos da LTDA
+export type CompanyCategoryType = 'CONTA' | 'IMPOSTO';
+
+export interface CompanyCategory {
+  id: number;
+  name: string;
+  type: CompanyCategoryType;
+}
+
+export interface CompanyCategoryRequest {
+  userId: number;
+  name: string;
+  type: CompanyCategoryType;
+}
+
+export interface CompanyExpense {
+  id: number;
+  categoryId: number;
+  categoryName: string;
+  categoryType: CompanyCategoryType;
+  description: string;
+  amount: number;
+  dueDate: string;
+  month: number;
+  year: number;
+  createdAt: string;
+}
+
+export interface CompanyExpenseRequest {
+  userId?: number;
+  categoryId?: number;
+  description?: string;
+  amount?: number;
+  dueDate?: string;
+  month?: number;
+  year?: number;
+}
+
 export interface SalaryDeduction {
   id: number;
   userId: number;

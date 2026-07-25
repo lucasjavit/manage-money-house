@@ -8,6 +8,7 @@ import Settings from './components/Settings'
 import ExtractUpload from './components/ExtractUpload'
 import LucasExpenses from './components/LucasExpenses'
 import LucasIT from './components/LucasIT'
+import Empresas from './components/Empresas'
 import SalaryPage from './components/SalaryPage'
 import InvestmentPage from './components/InvestmentPage'
 import Sidebar from './components/Sidebar'
@@ -113,6 +114,7 @@ const AppContent = () => {
             <Route path="/extract" element={<ExtractUpload />} />
             <Route path="/lucas-gastos" element={<LucasExpenses />} />
             <Route path="/lucas-it" element={<LucasIT />} />
+            <Route path="/empresas" element={<Empresas />} />
             <Route path="/salary" element={<SalaryPage />} />
             <Route path="/investments" element={<InvestmentPage />} />
           </Routes>
