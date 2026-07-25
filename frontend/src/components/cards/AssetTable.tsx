@@ -38,8 +38,9 @@ const RationaleTooltipPortal: React.FC<RationaleTooltipProps> = ({ asset, anchor
         left = Math.max(10, (viewportWidth - tooltipWidth) / 2);
       }
 
+      // Sempre ACIMA da linha (abaixo cortava o conteúdo nas últimas linhas da tela).
       setCoords({
-        top: rect.bottom + 8,
+        top: rect.top - 8,
         left: left,
       });
     }
@@ -84,7 +85,7 @@ const RationaleTooltipPortal: React.FC<RationaleTooltipProps> = ({ asset, anchor
 
   return ReactDOM.createPortal(
     <div
-      className="fixed z-[9999] bg-white border border-gray-200 rounded-xl shadow-2xl p-4 w-[350px]"
+      className="fixed z-[9999] bg-white border border-gray-200 rounded-xl shadow-2xl p-4 w-[350px] -translate-y-full"
       style={{ top: coords.top, left: coords.left }}
     >
       {/* Header com ticker */}
@@ -185,7 +186,7 @@ const RationaleTooltipPortal: React.FC<RationaleTooltipProps> = ({ asset, anchor
       )}
 
       {/* Seta indicadora */}
-      <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white border-l border-t border-gray-200 rotate-45" />
+      <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white border-r border-b border-gray-200 rotate-45" />
     </div>,
     document.body
   );
